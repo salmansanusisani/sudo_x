@@ -1,0 +1,421 @@
+import asyncio
+import os
+import platform
+import stat
+import time
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+
+from sudo_x.api import MAX_REQUEST_BYTES, create_app, session_token
+from sudo_x.engine import Engine
+from sudo_x.models import TERMINAL, TaskInput
+from sudo_x.store import Store, data_directory
+
+TOKEN = "test-session-token-" + "x" * 32
+BASE = "http://127.0.0.1:8765"
+AUTH = {"Authorization": f"Bearer {TOKEN}"}
+MUTATION = {**AUTH, "Origin": BASE}
+
+
+@pytest.fixture
+def storage(tmp_path, monkeypatch):
+    directory = tmp_path / "private-data"
+    monkeypatch.setenv("SUDOX_DATA_DIR", str(directory))
+    monkeypatch.setenv("SUDOX_SESSION_TOKEN", TOKEN)
+    return directory
+
+
+@pytest.fixture
+def client(storage):
+    with TestClient(create_app(), base_url=BASE) as test_client:
+        yield test_client
+
+
+def submit(client, kind="system", prompt="Show a local system snapshot"):
+    response = client.post("/api/tasks", headers=MUTATION, json={"prompt": prompt, "kind": kind})
+    assert response.status_code == 202, response.text
+    task = response.json()
+    assert task["status"] == "queued"
+    assert task["events"][0]["sequence"] == 1
+    return task
+
+
+def finished(client, task_id):
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/tasks/{task_id}", headers=AUTH)
+        assert response.status_code == 200
+        task = response.json()
+        if task["status"] in TERMINAL:
+            assert [event["sequence"] for event in task["events"]] == list(
+                range(1, len(task["events"]) + 1)
+            )
+            assert task["updated_at"] == task["events"][-1]["timestamp"]
+            return task
+    pytest.fail("Task did not reach a terminal state")
+
+
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/api/status"), ("GET", "/api/tasks"),
+    ("POST", "/api/tasks"), ("GET", f"/api/tasks/{uuid4()}"),
+    ("POST", f"/api/tasks/{uuid4()}/cancel"), ("GET", "/api/unknown"),
+])
+def test_all_api_routes_require_bearer(client, method, path):
+    for headers in ({}, {"Authorization": "Bearer wrong"}):
+        response = client.request(method, path, headers=headers)
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "unauthorized"
+        assert response.headers["www-authenticate"] == "Bearer"
+    assert client.request(method, path + f"?token={TOKEN}").status_code == 401
+
+
+def test_status_and_no_cors(client):
+    response = client.get("/api/status", headers=AUTH)
+    body = response.json()
+    assert body["mode"] == "local"
+    assert body["provider"] == "not_configured"
+    assert body["version"] == "0.1.0"
+    assert {cap["id"]: cap["enabled"] for cap in body["capabilities"]} == {
+        "system": True, "nigeria": True, "request": False,
+    }
+    assert TOKEN not in response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert "access-control-allow-origin" not in response.headers
+    preflight = client.options("/api/tasks", headers={
+        "Origin": "https://evil.example", "Access-Control-Request-Method": "POST",
+    })
+    assert preflight.status_code == 401
+    assert "access-control-allow-origin" not in preflight.headers
+
+
+@pytest.mark.parametrize("host", [
+    "evil.example:8765", "127.0.0.1.evil.example:8765", "0.0.0.0:8765",
+    "127.0.0.2:8765", "127.0.0.1:9999", "localhost:99999", "localhost.",
+    "user@localhost:8765", "[::1]:8765", "localhost:0",
+])
+def test_host_boundary(client, host):
+    for path in ("/", "/api/status"):
+        response = client.get(path, headers={**AUTH, "Host": host})
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "invalid_host"
+
+
+@pytest.mark.parametrize("origin", [
+    None, "null", "https://127.0.0.1:8765", "http://127.0.0.1:9999",
+    "http://localhost:8765/", "http://evil.example:8765",
+])
+def test_mutation_origin(client, origin):
+    headers = dict(AUTH)
+    if origin is not None:
+        headers["Origin"] = origin
+    for path in ("/api/tasks", f"/api/tasks/{uuid4()}/cancel"):
+        response = client.post(path, headers=headers, json={"prompt": "test", "kind": "request"})
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "invalid_origin"
+
+
+def test_localhost_and_custom_port(storage):
+    with TestClient(create_app(), base_url="http://localhost:9321") as client:
+        assert client.get("/api/status", headers=AUTH).status_code == 200
+        response = client.post("/api/tasks", headers={**AUTH, "Origin": "http://localhost:9321"},
+                               json={"prompt": "test", "kind": "request"})
+        assert response.status_code == 202
+        assert client.post("/api/tasks", headers=MUTATION, json={}).status_code == 403
+
+
+@pytest.mark.parametrize("body", [
+    {}, {"prompt": "", "kind": "system"}, {"prompt": "   ", "kind": "system"},
+    {"prompt": "x" * 2001, "kind": "system"}, {"prompt": "test", "kind": "shell"},
+    {"prompt": "test", "kind": "system", "command": "id"},
+    {"prompt": 42, "kind": "request"},
+])
+def test_input_validation(client, body):
+    response = client.post("/api/tasks", headers=MUTATION, json=body)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+    assert "input" not in response.json()
+
+
+def test_ids_and_body_limits(client):
+    assert client.get("/api/tasks/not-a-uuid", headers=AUTH).status_code == 422
+    assert client.get(f"/api/tasks/{uuid4()}", headers=AUTH).status_code == 404
+    assert client.post(f"/api/tasks/{uuid4()}/cancel", headers=MUTATION).status_code == 404
+    assert client.post("/api/tasks", headers=MUTATION, content="{").status_code == 422
+    response = client.post("/api/tasks", headers=MUTATION, content=b"x" * (MAX_REQUEST_BYTES + 1))
+    assert response.status_code == 413
+    response = client.post("/api/tasks", headers=MUTATION, content=iter([
+        b"x" * MAX_REQUEST_BYTES, b"x",
+    ]))
+    assert response.status_code == 413
+    assert client.post("/api/tasks", headers={**MUTATION, "Content-Encoding": "gzip"},
+                       content=b"body").status_code == 415
+
+
+def test_body_limit_counts_separate_asgi_chunks(client):
+    async def exercise():
+        chunks = iter([
+            {"type": "http.request", "body": b"x" * MAX_REQUEST_BYTES, "more_body": True},
+            {"type": "http.request", "body": b"x", "more_body": False},
+        ])
+        sent = []
+
+        async def receive():
+            return next(chunks)
+
+        async def send(message):
+            sent.append(message)
+
+        await client.app({
+            "type": "http", "http_version": "1.1", "method": "POST", "scheme": "http",
+            "path": "/api/tasks", "raw_path": b"/api/tasks", "query_string": b"",
+            "server": ("127.0.0.1", 8765), "client": ("127.0.0.1", 12345),
+            "headers": [
+                (b"host", b"127.0.0.1:8765"),
+                (b"authorization", f"Bearer {TOKEN}".encode()),
+                (b"origin", BASE.encode()),
+            ],
+        }, receive, send)
+        assert sent[0]["status"] == 413
+
+    client.portal.call(exercise)
+
+
+def test_system_snapshot_and_persistence(storage):
+    with TestClient(create_app(), base_url=BASE) as client:
+        task = finished(client, submit(client)["id"])
+        assert task["status"] == "completed"
+        assert task["scene"] == "system"
+        result = task["result"]
+        assert result["os"] == platform.system()
+        assert result["kernel"] == platform.release()
+        assert result["python"] == platform.python_version()
+        assert result["logical_cpu_count"] == os.cpu_count()
+        assert "hostname" not in result
+        assert set(result["memory"]) == {"total_bytes", "available_bytes"}
+        assert {event["phase"] for event in task["events"]} >= {"act", "verify", "complete"}
+        listing = client.get("/api/tasks", headers=AUTH).json()["tasks"]
+        assert listing == [task]
+        assert stat.S_IMODE(storage.stat().st_mode) == 0o700
+        for path in storage.iterdir():
+            assert stat.S_IMODE(path.stat().st_mode) & 0o077 == 0
+    with TestClient(create_app(), base_url=BASE) as client:
+        assert client.get(f"/api/tasks/{task['id']}", headers=AUTH).json() == task
+        assert client.post(f"/api/tasks/{task['id']}/cancel", headers=MUTATION).status_code == 409
+
+
+def test_offline_nigeria_and_generic_never_read_system(client, monkeypatch):
+    def forbidden():
+        pytest.fail("Only explicit system kind may collect local metrics")
+
+    monkeypatch.setattr("sudo_x.engine.system_snapshot", forbidden)
+    task = finished(client, submit(client, "nigeria", "Latest news from Nigeria")["id"])
+    assert task["status"] == "blocked"
+    assert task["scene"] == "map"
+    assert "live news provider not connected" in task["summary"].lower()
+    assert task["result"] == {
+        "label": "Nigeria", "mode": "offline_geography", "news_available": False,
+        "cities": [
+            {"name": "Abuja", "lat": 9.0765, "lon": 7.3986},
+            {"name": "Lagos", "lat": 6.5244, "lon": 3.3792},
+        ],
+    }
+    task = finished(client, submit(client, "request", "Scan files and show system snapshot")["id"])
+    assert task["status"] == "blocked"
+    assert task["scene"] == "overview"
+    assert task["result"] is None
+    assert "not connected" in task["summary"]
+    assert not any(event["phase"] in {"act", "verify", "complete"} for event in task["events"])
+
+
+def test_cancellation_stops_further_steps(storage, monkeypatch):
+    original = Engine._step
+
+    async def hold_before_action(self, task_id, phase, message, **kwargs):
+        if phase == "plan":
+            self.test_reached.set()
+            await self.test_release.wait()
+        return await original(self, task_id, phase, message, **kwargs)
+
+    monkeypatch.setattr(Engine, "_step", hold_before_action)
+    with TestClient(create_app(), base_url=BASE) as client:
+        engine = client.app.state.engine
+
+        async def setup():
+            engine.test_reached = asyncio.Event()
+            engine.test_release = asyncio.Event()
+
+        client.portal.call(setup)
+        task_id = submit(client)["id"]
+
+        async def wait():
+            await asyncio.wait_for(engine.test_reached.wait(), timeout=2)
+
+        client.portal.call(wait)
+        running = client.get(f"/api/tasks/{task_id}", headers=AUTH).json()
+        assert running["status"] == "running"
+        assert len(running["events"]) == 2
+        response = client.post(f"/api/tasks/{task_id}/cancel", headers=MUTATION)
+        assert response.status_code == 200
+        cancelled = response.json()
+        assert cancelled["status"] == "cancelled"
+        assert cancelled["result"] is None
+
+        async def release():
+            engine.test_release.set()
+            await asyncio.wait_for(engine.queue.join(), timeout=2)
+
+        client.portal.call(release)
+        assert client.get(f"/api/tasks/{task_id}", headers=AUTH).json() == cancelled
+        assert client.post(f"/api/tasks/{task_id}/cancel", headers=MUTATION).status_code == 409
+
+
+@pytest.mark.parametrize("running", [False, True])
+def test_restart_reconciles_unfinished(storage, running):
+    store = Store(storage)
+    task = store.create(TaskInput(prompt="Unfinished task", kind="system"))
+    if running:
+        store.advance(task.id, "observe", "Started before interruption.")
+    store.close()
+    with TestClient(create_app(), base_url=BASE) as client:
+        recovered = client.get(f"/api/tasks/{task.id}", headers=AUTH).json()
+        assert recovered["status"] == "blocked"
+        assert "Interrupted" in recovered["summary"]
+        assert recovered["result"] is None
+        assert recovered["events"][-1]["phase"] == "blocked"
+    with TestClient(create_app(), base_url=BASE) as client:
+        assert client.get(f"/api/tasks/{task.id}", headers=AUTH).json() == recovered
+
+
+def test_shutdown_cleans_worker_and_records_interruption(storage, monkeypatch):
+    async def wait_forever(self, _task_id):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(Engine, "_run", wait_forever)
+    with TestClient(create_app(), base_url=BASE) as client:
+        task_id = submit(client)["id"]
+        worker = client.app.state.engine.worker
+    assert worker.done()
+    store = Store(storage)
+    try:
+        assert store.get(task_id).status == "blocked"
+        assert "shutdown" in store.get(task_id).summary
+    finally:
+        store.close()
+
+
+def test_failures_are_honest_and_sanitized(client, monkeypatch):
+    def broken():
+        raise OSError("private/path or token must not escape")
+
+    monkeypatch.setattr("sudo_x.engine.system_snapshot", broken)
+    task = finished(client, submit(client)["id"])
+    assert task["status"] == "failed"
+    assert task["result"] is None
+    assert "private/path" not in str(task)
+    assert not any(event["phase"] == "complete" for event in task["events"])
+
+
+def test_history_cap_and_recent_fifty(client, monkeypatch):
+    async def seed():
+        store = client.app.state.store
+        for number in range(55):
+            task = store.create(TaskInput(prompt=f"Task {number}", kind="request"))
+            store.advance(task.id, "blocked", "Unsupported fixture.", status="blocked")
+
+    client.portal.call(seed)
+    tasks = client.get("/api/tasks", headers=AUTH).json()["tasks"]
+    assert len(tasks) == 50
+    assert tasks[0]["prompt"] == "Task 54"
+    monkeypatch.setattr("sudo_x.store.MAX_TASKS", 55)
+    response = client.post(
+        "/api/tasks", headers=MUTATION, json={"prompt": "overflow", "kind": "request"}
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "task_limit_reached"
+    assert client.get(f"/api/tasks/{tasks[-1]['id']}", headers=AUTH).status_code == 200
+
+
+def test_active_queue_is_bounded(storage, monkeypatch):
+    async def wait_forever(self, _task_id):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(Engine, "_run", wait_forever)
+    with TestClient(create_app(), base_url=BASE) as client:
+        for _ in range(32):
+            submit(client, "request", "queued")
+        response = client.post("/api/tasks", headers=MUTATION,
+                               json={"prompt": "overflow", "kind": "request"})
+        assert response.status_code == 429
+        assert response.json()["error"]["code"] == "queue_full"
+
+
+def test_static_assets_and_traversal(storage, tmp_path):
+    assets = tmp_path / "dist"
+    assets.mkdir()
+    (assets / "index.html").write_text("<!doctype html><title>SUDO X test</title>")
+    (assets / "main.js").write_text("// test bundle")
+    outside = tmp_path / "private.txt"
+    outside.write_text("must not be served")
+    (assets / "escape.txt").symlink_to(outside)
+    with TestClient(create_app(ui_dir=assets), base_url=BASE) as client:
+        assert client.get("/").status_code == 200
+        assert client.get("/main.js").text == "// test bundle"
+        assert client.get("/tasks/view").status_code == 200
+        assert client.get("/missing.js").status_code == 404
+        for path in ("/%2e%2e/private.txt", "/escape.txt", "/.env", "/%5cprivate.txt"):
+            response = client.get(path)
+            assert response.status_code == 404
+            assert "must not be served" not in response.text
+        assert client.get("/api/unknown", headers=AUTH).status_code == 404
+        assert client.get("/api/unknown").status_code == 401
+    with TestClient(create_app(ui_dir=tmp_path / "missing-dist"), base_url=BASE) as client:
+        assert client.get("/").json()["error"]["code"] == "ui_not_built"
+        assert client.get("/api/status", headers=AUTH).status_code == 200
+
+
+def test_storage_permissions_and_single_process(storage, tmp_path):
+    store = Store(storage)
+    try:
+        with pytest.raises(ValueError, match="Another SUDO X"):
+            Store(storage)
+    finally:
+        store.close()
+    unsafe = tmp_path / "public-data"
+    unsafe.mkdir(mode=0o755)
+    unsafe.chmod(0o755)
+    with pytest.raises(ValueError, match="0700"):
+        Store(unsafe)
+    linked = tmp_path / "linked-data"
+    linked.symlink_to(storage, target_is_directory=True)
+    with pytest.raises(ValueError, match="non-symlink"):
+        Store(linked)
+
+
+def test_xdg_and_token_configuration(monkeypatch, tmp_path):
+    monkeypatch.delenv("SUDOX_DATA_DIR", raising=False)
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    assert data_directory() == tmp_path / "sudo-x"
+    monkeypatch.setenv("SUDOX_DATA_DIR", "relative/path")
+    with pytest.raises(ValueError, match="absolute"):
+        data_directory()
+    monkeypatch.delenv("SUDOX_SESSION_TOKEN", raising=False)
+    assert session_token() != session_token()
+    monkeypatch.setenv("SUDOX_SESSION_TOKEN", "short")
+    with pytest.raises(ValueError, match="32-256"):
+        session_token()
+
+
+def test_cli_rejects_root_and_nonloopback(monkeypatch):
+    from sudo_x.cli import main
+
+    monkeypatch.setattr("sys.argv", ["sudo-x"])
+    monkeypatch.setattr(os, "getuid", lambda: 0)
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2
+    monkeypatch.setattr("sys.argv", ["sudo-x", "--host", "0.0.0.0"])
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2

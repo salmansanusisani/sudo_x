@@ -12,7 +12,11 @@ export type Task = {
   result: Snapshot | { label: string; mode: string; news_available: boolean; cities: { name: string; lat: number; lon: number }[] } | null;
 }
 export type BackendStatus = {
-  mode: string; provider: string; version: string;
+  mode: string;
+  provider: 'not_configured' | 'mock' | 'nebius';
+  provider_model: string | null;
+  provider_ready: boolean;
+  version: string;
   capabilities: { id: string; label: string; enabled: boolean; description: string }[];
 }
 

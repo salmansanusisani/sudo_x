@@ -163,6 +163,7 @@ function App() {
         <div className="page-heading"><div><div className="eyebrow"><span className="short-line"/> YOUR WORLD. IN FOCUS.</div><h1>{section === 'control' ? 'Mission control' : section === 'missions' ? 'Mission archive' : section === 'security' ? 'Security lab' : section === 'code' ? 'Code workspace' : 'System preferences'}<span className="heading-dot">.</span></h1></div><button className="quiet-button privacy-button" onClick={() => setSection('settings')}><LockKeyhole size={14}/> Local-first by design <ChevronRight size={14}/></button></div>
 
         {!token && <div className="notice session-notice"><LockKeyhole size={17}/><div><b>Interface preview</b><span>To run local tasks, open the private session URL printed by <code>sudo-x</code>. No model or machine control is connected.</span></div></div>}
+        {backend?.provider === 'mock' && <div className="notice"><Sparkles size={17}/><div><b>Provider boundary / mock</b><span>Planning is isolated and non-executable. No external request or machine action is available.</span></div></div>}
         {error && <div className="notice error" role="alert"><CircleHelp size={17}/><span>{error}</span><button className="icon-button" aria-label="Dismiss notification" onClick={() => setError('')}><X size={16}/></button></div>}
         {stream && <div className="sharing-banner"><span className="status-dot green"/> Screen sharing active. Visible only in this local window; not sent to AI.<button onClick={stopScreen}><Square size={12}/> Stop sharing</button></div>}
 

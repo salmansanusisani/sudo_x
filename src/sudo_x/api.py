@@ -14,6 +14,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from sudo_x.engine import Engine
 from sudo_x.models import APIError, BackendStatus, Capability, Task, TaskInput, TaskList
+from sudo_x.provider import ProviderConfig, provider_config
 from sudo_x.store import Store, data_directory
 
 MAX_REQUEST_BYTES = 32768
@@ -147,10 +148,15 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.session_token = token if token is not None else session_token()
+        try:
+            configured_provider = provider_config()
+        except ValueError as exc:
+            raise RuntimeError(f"Invalid SUDO X provider configuration: {exc}") from exc
         store = Store(data_directory())
         engine = Engine(store)
         app.state.store = store
         app.state.engine = engine
+        app.state.provider = configured_provider
         try:
             engine.start()
             yield
@@ -189,7 +195,12 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
 
     @app.get("/api/status", response_model=BackendStatus)
     async def status():
-        return BackendStatus(capabilities=[
+        configured: ProviderConfig = app.state.provider
+        return BackendStatus(
+            provider=configured.kind,
+            provider_model=configured.model,
+            provider_ready=configured.kind == "mock",
+            capabilities=[
             Capability(
                 id="system", label="Local system snapshot", enabled=True,
                 description="Explicit read-only OS, Python, CPU, load and memory snapshot.",
@@ -200,7 +211,11 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             ),
             Capability(
                 id="request", label="General assistant", enabled=False,
-                description="Provider and general machine tools are not connected.",
+                description=(
+                    "Provider planning is isolated and cannot execute tools in this build."
+                    if configured.kind == "mock"
+                    else "Provider and general machine tools are not connected."
+                ),
             ),
         ])
 

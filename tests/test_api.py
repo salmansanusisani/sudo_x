@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sudo_x.api import MAX_REQUEST_BYTES, create_app, session_token
 from sudo_x.engine import Engine
 from sudo_x.models import TERMINAL, TaskInput
+from sudo_x.provider import MockPlanner, provider_config
 from sudo_x.store import Store, data_directory
 
 TOKEN = "test-session-token-" + "x" * 32
@@ -88,6 +89,38 @@ def test_status_and_no_cors(client):
     })
     assert preflight.status_code == 401
     assert "access-control-allow-origin" not in preflight.headers
+
+
+def test_default_provider_is_not_configured(storage, monkeypatch):
+    monkeypatch.delenv("SUDOX_PROVIDER", raising=False)
+    assert provider_config().kind == "not_configured"
+    with TestClient(create_app(), base_url=BASE) as local_client:
+        response = local_client.get("/api/status", headers=AUTH)
+    assert response.status_code == 200
+    assert response.json()["provider"] == "not_configured"
+    assert response.json()["provider_ready"] is False
+
+
+def test_mock_provider_is_deterministic_and_non_executable(monkeypatch):
+    config = provider_config({"SUDOX_PROVIDER": "mock"})
+    plan = MockPlanner(config).plan("inspect this project")
+    assert plan.provider == "mock"
+    assert plan.action == "blocked"
+    assert "No external request was made" in plan.message
+
+
+@pytest.mark.parametrize("environ", [
+    {"SUDOX_PROVIDER": "unknown"},
+    {"SUDOX_PROVIDER": "nebius"},
+    {"SUDOX_PROVIDER": "nebius", "SUDOX_MODEL_PRIMARY": "model"},
+    {
+        "SUDOX_PROVIDER": "nebius", "SUDOX_MODEL_PRIMARY": "model",
+        "NEBIUS_API_KEY": "key", "NEBIUS_BASE_URL": "http://bad",
+    },
+])
+def test_provider_configuration_rejects_unsafe_or_incomplete_values(environ):
+    with pytest.raises(ValueError):
+        provider_config(environ)
 
 
 @pytest.mark.parametrize("host", [

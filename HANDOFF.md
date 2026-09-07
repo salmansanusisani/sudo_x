@@ -19,6 +19,7 @@ Current project files:
 - `HANDOFF.md`: this actual-state record.
 - `ui/`: React/Vite GUI source, offline globe, local screen preview, responsive styles, and browser tests.
 - `src/sudo_x/`: FastAPI loopback backend, SQLite task/event store, bounded local task engine, and launcher CLI.
+- `src/sudo_x/provider.py`: explicit provider configuration and deterministic non-executable mock planner boundary.
 - `launch.sh`: normal-user Chromium app-mode launcher after the GUI build.
 - `THIRD_PARTY_NOTICES.md`: geographic and interface dependency attribution.
 
@@ -82,16 +83,17 @@ No service, database outside test/runtime data, sandbox, model calls, live secur
 - `cd ui && npm run test:e2e`: **9 passed** using Chromium.
 - Browser checks cover preview/no external requests, real system snapshot, persistence after refresh, offline Nigeria scene without fabricated news, unsupported request blocking, privacy/settings controls, mobile overflow, expired sessions, keyboard-accessible dialog, and stopping local screen capture tracks.
 - Test-only server is `tests/serve_e2e.py`; it uses a temporary data directory and fixture bearer token. Never use that token for a real session.
+- Provider boundary tests cover default `not_configured`, deterministic mock planning with no network/action execution, and rejection of incomplete/unsafe Nebius configuration.
 
 ## Exact Next Step
 
 The user has approved actual coding and the first visual slice is complete. Before live security, remote work, microphone input, screen upload, or paid inference, confirm the relevant separate permission and budget. Do not ask for API keys, passwords, or private SSH keys in chat. Do not repeat the resolved question about time constraints.
 
-Next: implement the provider boundary and capability registry, beginning with a fake/test provider that cannot perform actions, then an explicitly approved synthetic Nebius/NVIDIA probe using a user-configured secret. Keep general requests blocked until structured tool calling, cloud disclosure, budgets, and deterministic policy checks exist. After that, implement Nmap fixture parsing and scope validation before any live authorized scan. Remote diagnostics precede remote mutation.
+Next: add a capability registry and structured plan envelope on top of the provider boundary. Then, only after the user explicitly approves a synthetic call and configures a secret locally, implement the Nebius/NVIDIA transport with cloud-disclosure and budget checks. Keep general requests blocked until structured tool calling, cloud disclosure, budgets, and deterministic policy checks exist. After that, implement Nmap fixture parsing and scope validation before any live authorized scan. Remote diagnostics precede remote mutation.
 
 ## Resume Prompt
 
-> Continue SUDO X in `/home/salman/Documents/Python/sudo x/`. Read README.md, PROJECT_BLUEPRINT.md, and HANDOFF.md first. The first GUI/backend slice is implemented; verify it before extending it. Preserve unrelated work and leave sibling `sudo/` untouched. Do not enable live news, Nebius calls, microphone, Nmap, SSH, arbitrary shell, or computer control without the separate user permission and safety gate. Next implement the provider/capability boundary with mocks and tests, then the approved synthetic Nebius probe. Keep security authority outside the model, run the smallest tests after each change, and update this handoff with actual results before ending.
+> Continue SUDO X in `/home/salman/Documents/Python/sudo x/`. Read README.md, PROJECT_BLUEPRINT.md, and HANDOFF.md first. The GUI/backend and provider boundary are implemented and verified. Preserve unrelated work and leave sibling `sudo/` untouched. Do not enable live news, Nebius calls, microphone, Nmap, SSH, arbitrary shell, or computer control without the separate user permission and safety gate. Next implement the capability registry and structured non-executable plan envelope; only then consider an explicitly approved synthetic Nebius probe. Keep security authority outside the model, run the smallest tests after each change, and update this handoff with actual results before ending.
 
 ## Session Update Template
 

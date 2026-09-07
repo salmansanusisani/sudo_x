@@ -48,7 +48,9 @@ class Capability(BaseModel):
 
 class BackendStatus(BaseModel):
     mode: Literal["local"] = "local"
-    provider: Literal["not_configured"] = "not_configured"
+    provider: Literal["not_configured", "mock", "nebius"] = "not_configured"
+    provider_model: str | None = None
+    provider_ready: bool = False
     version: str = "0.1.0"
     capabilities: list[Capability]
 

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { type } from 'node:os'
 
 const token = 'test-fixture-token-not-for-real-use-00001'
 const connect = async (page: import('@playwright/test').Page) => {
@@ -25,9 +26,9 @@ test('preview is usable and never performs external requests', async ({ page }) 
 test('real snapshot produces evidence and persists across refresh', async ({ page }) => {
   await connect(page)
   await page.getByRole('button', { name: 'Inspect this machine', exact: true }).click()
-  await expect(page.getByText('Read-only local system snapshot collected. No system changes made.', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(/Read-only local system snapshot collected. No system changes made./).first()).toBeVisible()
   await expect(page.getByText('Operating system', { exact: true })).toBeVisible()
-  await expect(page.getByText('Linux', { exact: true })).toBeVisible()
+  await expect(page.getByText(type() === 'Windows_NT' ? 'Windows' : type(), { exact: true })).toBeVisible()
   await expect(page.getByLabel('Execution trace')).toContainText('No system changes made')
   await page.reload()
   await page.getByRole('button', { name: 'Mission history', exact: true }).click()

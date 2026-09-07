@@ -11,6 +11,14 @@ import uvicorn
 from sudo_x.api import create_app, session_token
 
 
+def is_privileged() -> bool:
+    if os.name == "nt":
+        import ctypes
+
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    return os.getuid() == 0 or os.geteuid() == 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="SUDO X normal-user loopback-only local backend")
     parser.add_argument("--port", type=int, default=8765, help="Loopback TCP port (default: 8765)")
@@ -22,8 +30,8 @@ def main() -> None:
         help="Open a standalone Chromium app window (falls back to the default browser)",
     )
     args = parser.parse_args()
-    if os.getuid() == 0 or os.geteuid() == 0:
-        parser.error("Run sudo-x as your normal user, never with sudo/root.")
+    if is_privileged():
+        parser.error("Run sudo-x as your normal user, never with sudo/root or as administrator.")
     if not 1 <= args.port <= 65535:
         parser.error("--port must be between 1 and 65535.")
     try:

@@ -90,6 +90,7 @@ After reviewing the disclosure, configuring `NEBIUS_API_KEY` securely in the loc
 - Persistent local SQLite task/event history and restart reconciliation.
 - Native Windows setup/launcher and private storage, alongside the Linux implementation.
 - Standalone synthetic Nebius transport with disclosure preview and offline failure/boundary tests; live validation pending.
+- Bounded live model benchmark: `nvidia/Nemotron-3_5-Lightning` is the measured default candidate; `nvidia/Nemotron-3-Ultra-550b-a55b` is retained for escalation. Benchmark evidence is recorded in `HANDOFF.md`.
 - Optional user-selected screen preview using browser permission. Frames remain in the local view and are not sent to AI; computer control is not implemented.
 - Optional local browser speech narration if an available local voice exists. Microphone input is not accessed.
 - Honest blocked states for general requests, live news, arbitrary shell, security tools, remote machines, and model reasoning.

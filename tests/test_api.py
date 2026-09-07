@@ -123,6 +123,30 @@ def test_capabilities_endpoint_explains_disabled_authority(client):
     assert by_id["code.sandbox"]["effect"] == "mutate"
 
 
+def test_planner_preview_requires_a_configured_non_executable_planner(client):
+    response = client.post(
+        "/api/planner/preview", headers=MUTATION, json={"prompt": "inspect my project"}
+    )
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "planner_not_ready"
+
+
+def test_mock_planner_preview_returns_data_only(storage, monkeypatch):
+    monkeypatch.setenv("SUDOX_PROVIDER", "mock")
+    with TestClient(create_app(), base_url=BASE) as local_client:
+        response = local_client.post(
+            "/api/planner/preview", headers=MUTATION, json={"prompt": "inspect my project"}
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider"] == "mock"
+    assert body["envelope"] == {
+        "version": "1", "capability_id": "request", "action": "blocked",
+        "arguments": {}, "rationale": "Mock provider cannot execute.",
+    }
+    assert "No external request was made" in body["message"]
+
+
 @pytest.mark.parametrize("payload", [
     {
         "capability_id": "request", "action": "propose", "rationale": "x",

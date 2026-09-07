@@ -11,6 +11,10 @@ export type Task = {
   events: TaskEvent[]; scene: 'system' | 'map' | 'overview';
   result: Snapshot | { label: string; mode: string; news_available: boolean; cities: { name: string; lat: number; lon: number }[] } | null;
 }
+export type PlannerPreview = {
+  provider: 'mock' | 'nebius' | 'not_configured'; model: string | null; message: string;
+  envelope: { version: string; capability_id: string; action: string; arguments: Record<string, unknown>; rationale: string };
+}
 export type BackendStatus = {
   mode: string;
   provider: 'not_configured' | 'mock' | 'nebius';

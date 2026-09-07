@@ -19,11 +19,13 @@ from sudo_x.models import (
     BackendStatus,
     CapabilityDescriptor,
     CapabilityList,
+    PlannerPreview,
+    PlannerPreviewInput,
     Task,
     TaskInput,
     TaskList,
 )
-from sudo_x.provider import ProviderConfig, provider_config
+from sudo_x.provider import ProviderConfig, planner_for, provider_config
 from sudo_x.store import Store, data_directory
 
 MAX_REQUEST_BYTES = 32768
@@ -166,6 +168,7 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
         app.state.store = store
         app.state.engine = engine
         app.state.provider = configured_provider
+        app.state.planner = planner_for(configured_provider)
         try:
             engine.start()
             yield
@@ -221,6 +224,25 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             )
             for item in registry(provider_kind=configured.kind)
         ])
+
+    @app.post("/api/planner/preview", response_model=PlannerPreview)
+    async def planner_preview(body: PlannerPreviewInput, request: Request):
+        planner = request.app.state.planner
+        if planner is None:
+            raise APIError(
+                409,
+                "planner_not_ready",
+                "No non-executable planner is configured for this local session.",
+            )
+        plan = planner.plan(body.prompt)
+        if plan.envelope is None:
+            raise APIError(500, "invalid_plan", "The provider returned no validated plan envelope.")
+        return PlannerPreview(
+            provider=plan.provider,
+            model=plan.model,
+            message=plan.message,
+            envelope=plan.envelope.model_dump(mode="json"),
+        )
 
     @app.get("/api/tasks", response_model=TaskList)
     async def tasks(request: Request):

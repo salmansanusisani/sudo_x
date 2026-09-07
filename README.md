@@ -57,6 +57,7 @@ cd ui && npm run test:e2e
 - Honest blocked states for general requests, live news, arbitrary shell, security tools, remote machines, and model reasoning.
 - Same-origin loopback API with bearer session token, host/origin checks, security headers, request limits, and no external runtime assets.
 - Versioned `/api/capabilities` registry and strict non-executable plan envelope. Disabled capabilities expose their effect and blocking reason; they cannot be activated by model output.
+- Planner preview control: submits text only to the configured non-executable provider boundary and displays the validated envelope. In the default provider mode it returns an explicit blocked state; no tool is executed.
 
 This is a functioning first slice, not the finished JARVIS vision. Nmap, SSH, coding execution, live news retrieval, Nebius/NVIDIA reasoning, memory skills, and autonomous computer control remain planned integrations.
 

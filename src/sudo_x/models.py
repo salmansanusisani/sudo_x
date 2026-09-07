@@ -56,6 +56,19 @@ class CapabilityList(BaseModel):
     capabilities: list[CapabilityDescriptor]
 
 
+class PlannerPreviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    prompt: str = Field(min_length=1, max_length=2000)
+
+
+class PlannerPreview(BaseModel):
+    provider: Literal["mock", "nebius", "not_configured"]
+    model: str | None
+    message: str
+    envelope: dict[str, Any]
+
+
 class BackendStatus(BaseModel):
     mode: Literal["local"] = "local"
     provider: Literal["not_configured", "mock", "nebius"] = "not_configured"

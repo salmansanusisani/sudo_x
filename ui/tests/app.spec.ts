@@ -54,6 +54,14 @@ test('unsupported instructions are safely rendered and blocked', async ({ page }
   await expect(page.getByText('<script>alert(1)</script> run nmap on the Internet', { exact: true })).toBeVisible()
 })
 
+test('planner preview is explicit and non-executable', async ({ page }) => {
+  await connect(page)
+  await page.getByLabel('Your mission').fill('inspect my project and run a command')
+  await page.getByRole('button', { name: 'Preview plan', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('No non-executable planner is configured')
+  await expect(page.getByText('NON-EXECUTABLE PLAN', { exact: true })).toHaveCount(0)
+})
+
 test('desktop view and privacy controls disclose boundaries', async ({ page }) => {
   await connect(page)
   await page.getByRole('button', { name: 'Open my desktop view' }).click()

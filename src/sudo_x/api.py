@@ -211,7 +211,7 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
         return BackendStatus(
             provider=configured.kind,
             provider_model=configured.model,
-            provider_ready=configured.kind == "mock",
+            provider_ready=configured.kind in {"mock", "nebius"},
             capabilities=[item.public() for item in registry(provider_kind=configured.kind)],
         )
 
@@ -234,7 +234,10 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
                 "planner_not_ready",
                 "No non-executable planner is configured for this local session.",
             )
-        plan = planner.plan(body.prompt)
+        try:
+            plan = planner.plan(body.prompt)
+        except ValueError as exc:
+            raise APIError(502, "planner_unavailable", str(exc)) from exc
         if plan.envelope is None:
             raise APIError(500, "invalid_plan", "The provider returned no validated plan envelope.")
         return PlannerPreview(

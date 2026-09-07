@@ -80,7 +80,7 @@ The next provider milestone has a standalone, synthetic-only transport. It does 
 
 Replace the placeholder with an exact NVIDIA model ID available in your Nebius account. The preview contains the fixed imaginary-service scenario, endpoint, completion cap (at most 256), one-request limit per invocation, 15-second deadline, and 32 KiB response cap. It sends no machine snapshot, files, task history, or user prompts. The transport follows the [Nebius chat completions API](https://docs.tokenfactory.nebius.com/api-reference/inference/create-chat-completion).
 
-After reviewing the disclosure, configuring `NEBIUS_API_KEY` securely in the local environment, and confirming an account-side spending limit, explicitly sending requires all three flags: `--send --approve-synthetic-cloud --confirm-account-spend-limit`. There are no retries or redirects. These confirmations are manual; the app cannot verify the account's spending or retention settings. Cost remains unknown, token/time limits are not dollar limits, and a timed-out call may still be billed. `store=false` does not establish organization-level Zero Data Retention. No live probe has been run or hackathon inference requirement demonstrated yet.
+After reviewing the disclosure, configuring `NEBIUS_API_KEY` securely in the local environment, and confirming an account-side spending limit, explicitly sending requires all three flags: `--send --approve-synthetic-cloud --confirm-account-spend-limit`. There are no retries or redirects. These confirmations are manual; the app cannot verify the account's spending or retention settings. Cost remains unknown, token/time limits are not dollar limits, and a timed-out call may still be billed. `store=false` does not establish organization-level Zero Data Retention. A real guarded Token Factory call and live Lightning planner preview have now been verified with synthetic content.
 
 ## Current Implementation
 
@@ -89,14 +89,14 @@ After reviewing the disclosure, configuring `NEBIUS_API_KEY` securely in the loc
 - Real read-only local system snapshot: OS, kernel, Python, CPU count, load, and memory from bounded local observations.
 - Persistent local SQLite task/event history and restart reconciliation.
 - Native Windows setup/launcher and private storage, alongside the Linux implementation.
-- Standalone synthetic Nebius transport with disclosure preview and offline failure/boundary tests; live validation pending.
+- Standalone guarded Nebius transport with disclosure preview and offline failure/boundary tests; live validation verified with synthetic content.
 - Bounded live model benchmark: `nvidia/Nemotron-3_5-Lightning` is the measured default candidate; `nvidia/Nemotron-3-Ultra-550b-a55b` is retained for escalation. Benchmark evidence is recorded in `HANDOFF.md`.
 - Optional user-selected screen preview using browser permission. Frames remain in the local view and are not sent to AI; computer control is not implemented.
 - Optional local browser speech narration if an available local voice exists. Microphone input is not accessed.
-- Honest blocked states for general requests, live news, arbitrary shell, security tools, remote machines, and model reasoning.
+- Honest blocked states for general requests, live news, arbitrary shell, security tools, remote machines, and model execution; bounded planner preview can use live Nebius inference with explicit disclosure.
 - Same-origin loopback API with bearer session token, host/origin checks, security headers, request limits, and no external runtime assets.
 - Versioned `/api/capabilities` registry and strict non-executable plan envelope. Disabled capabilities expose their effect and blocking reason; they cannot be activated by model output.
-- Planner preview control: submits text only to the configured non-executable provider boundary and displays the validated envelope. In the default provider mode it returns an explicit blocked state; no tool is executed.
+- Planner preview control: submits text only to the configured non-executable provider boundary and displays the validated envelope. Nebius previews disclose that the prompt leaves the machine; no tool is executed.
 - Capability registry panel in Settings: shows each registered capability's effect class, description, and blocking reason from the authenticated backend contract.
 
 This is a functioning first slice, not the finished JARVIS vision. Nmap, SSH, coding execution, live news retrieval, Nebius/NVIDIA reasoning, memory skills, and autonomous computer control remain planned integrations.

@@ -63,6 +63,16 @@ test('planner preview is explicit and non-executable', async ({ page }) => {
   await expect(page.getByText('NON-EXECUTABLE PLAN', { exact: true })).toHaveCount(0)
 })
 
+test('live planner preview shows cloud disclosure when enabled', async ({ page }) => {
+  test.skip(!process.env.SUDOX_LIVE_E2E, 'Live provider test spends inference credit.')
+  await connect(page)
+  await page.getByLabel('Your mission').fill('Prepare a read-only system observation plan.')
+  await page.getByRole('button', { name: 'Preview plan', exact: true }).click()
+  await expect(page.getByText('CLOUD DISCLOSURE', { exact: true })).toBeVisible()
+  await expect(page.getByText('Nebius Token Factory', { exact: true })).toBeVisible()
+  await expect(page.getByText(/No tool, file, network, or machine action/)).toBeVisible()
+})
+
 test('desktop view and privacy controls disclose boundaries', async ({ page }) => {
   await connect(page)
   await page.getByRole('button', { name: 'Open my desktop view' }).click()

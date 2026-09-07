@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import platform
 import stat
@@ -11,7 +12,7 @@ from fastapi.testclient import TestClient
 from sudo_x.api import MAX_REQUEST_BYTES, create_app, session_token
 from sudo_x.engine import Engine
 from sudo_x.models import TERMINAL, TaskInput
-from sudo_x.provider import MockPlanner, NebiusPlanner, PlanEnvelope, planner_for, provider_config
+from sudo_x.provider import MockPlanner, NebiusPlanner, PlanEnvelope, provider_config
 from sudo_x.store import Store, data_directory
 
 TOKEN = "test-session-token-" + "x" * 32
@@ -112,14 +113,29 @@ def test_mock_provider_is_deterministic_and_non_executable(monkeypatch):
     assert plan.envelope.action == "blocked"
 
 
-def test_synthetic_nebius_planner_is_typed_and_non_networked():
+def test_nebius_planner_is_typed_and_non_executable(monkeypatch):
+    import httpx
+
+    monkeypatch.setenv("NEBIUS_API_KEY", "test-key")
     config = provider_config({
         "SUDOX_PROVIDER": "nebius",
         "SUDOX_MODEL_PRIMARY": "nvidia/synthetic-test",
         "NEBIUS_API_KEY": "not-used-by-synthetic-probe",
     })
-    planner = planner_for(config)
-    assert isinstance(planner, NebiusPlanner)
+    def handler(_request):
+        return httpx.Response(200, json={
+            "model": "nvidia/synthetic-test",
+            "choices": [{"finish_reason": "stop", "message": {"content": json.dumps({
+                "version": "1", "capability_id": "request", "action": "propose",
+                "arguments": {}, "rationale": "A typed non-executable proposal.",
+            })}}],
+        })
+
+    planner = NebiusPlanner(
+        config, client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handler), **kwargs
+        )
+    )
     plan = planner.plan("inspect this project")
     assert plan.provider == "nebius"
     assert plan.action == "answer"
@@ -127,13 +143,63 @@ def test_synthetic_nebius_planner_is_typed_and_non_networked():
     assert plan.envelope.action == "propose"
     assert plan.cloud_disclosure is not None
     assert plan.cloud_disclosure.base_url == config.base_url
-    assert "No external request was made" in plan.message
+    assert "No tool" in plan.message
 
 
-def test_synthetic_nebius_preview_discloses_local_probe(storage, monkeypatch):
+def test_nebius_planner_validates_live_response_without_tools(monkeypatch):
+    import httpx
+
+    monkeypatch.setenv("NEBIUS_API_KEY", "test-key")
+    config = provider_config({
+        "SUDOX_PROVIDER": "nebius", "SUDOX_MODEL_PRIMARY": "nvidia/test",
+        "NEBIUS_API_KEY": "test-key",
+    })
+
+    def handler(request):
+        assert request.headers["Authorization"] == "Bearer test-key"
+        payload = request.read().decode()
+        assert "No machine snapshot" not in payload
+        return httpx.Response(200, json={
+            "model": "nvidia/test",
+            "choices": [{"finish_reason": "stop", "message": {"content": json.dumps({
+                "version": "1", "capability_id": "system", "action": "propose",
+                "arguments": {}, "rationale": "Read-only observation requested.",
+            })}}],
+        })
+
+    import json
+
+    planner = NebiusPlanner(
+        config, client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handler), **kwargs
+        )
+    )
+    plan = planner.plan("inspect the fictional local system")
+    assert plan.envelope is not None
+    assert plan.envelope.capability_id == "system"
+    assert plan.cloud_disclosure is not None
+    assert "sent to Nebius" in plan.cloud_disclosure.data_handling
+
+
+def test_nebius_preview_discloses_cloud_boundary(storage, monkeypatch):
     monkeypatch.setenv("SUDOX_PROVIDER", "nebius")
     monkeypatch.setenv("SUDOX_MODEL_PRIMARY", "nvidia/synthetic-test")
     monkeypatch.setenv("NEBIUS_API_KEY", "not-used-by-synthetic-probe")
+    import httpx
+
+    real_client = httpx.Client
+    def handler(_request):
+        return httpx.Response(200, json={
+            "model": "nvidia/synthetic-test",
+            "choices": [{"finish_reason": "stop", "message": {"content": json.dumps({
+                "version": "1", "capability_id": "request", "action": "propose",
+                "arguments": {}, "rationale": "Synthetic test proposal.",
+            })}}],
+        })
+    monkeypatch.setattr(
+        "sudo_x.provider.httpx.Client",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(handler), **kwargs),
+    )
     with TestClient(create_app(), base_url=BASE) as local_client:
         response = local_client.post(
             "/api/planner/preview", headers=MUTATION, json={"prompt": "inspect this project"}
@@ -141,8 +207,8 @@ def test_synthetic_nebius_preview_discloses_local_probe(storage, monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["provider"] == "nebius"
-    assert body["cloud_disclosure"]["provider"] == "Nebius synthetic transport"
-    assert body["cloud_disclosure"]["data_handling"].startswith("Synthetic local probe")
+    assert body["cloud_disclosure"]["provider"] == "Nebius Token Factory"
+    assert "sent to Nebius" in body["cloud_disclosure"]["data_handling"]
     assert body["envelope"]["action"] == "propose"
 
 

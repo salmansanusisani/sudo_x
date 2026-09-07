@@ -31,7 +31,8 @@ def registry(*, provider_kind: str = "not_configured") -> tuple[CapabilitySpec, 
     planner_description = {
         "mock": "Deterministic non-executable planning boundary; no external request is made.",
         "nebius": (
-            "Synthetic Nebius/NVIDIA transport is enabled for non-executable local probing only."
+            "Bounded Nebius/NVIDIA planning preview; prompts are disclosed before cloud inference "
+            "and output cannot execute tools."
         ),
     }.get(provider_kind, "No reasoning provider is configured.")
     return (
@@ -47,10 +48,12 @@ def registry(*, provider_kind: str = "not_configured") -> tuple[CapabilitySpec, 
         ),
         CapabilitySpec(
             id="planner", label="Structured reasoning planner", effect="plan",
-            enabled=provider_kind == "mock", description=planner_description,
+            enabled=provider_kind in {"mock", "nebius"}, description=planner_description,
             reason=("Mock planner loaded." if provider_kind == "mock"
                     else (
-                        "Synthetic transport only; no cloud request or tool authority is enabled."
+                        "Live bounded preview loaded; no cloud tool authority is enabled."
+                        if provider_kind == "nebius"
+                        else "A real provider call is not enabled in this build."
                     )),
         ),
         CapabilitySpec(

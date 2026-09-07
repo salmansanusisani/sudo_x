@@ -1,10 +1,10 @@
 """Provider boundary: model access is explicit, typed, and disabled by default."""
 
 import os
-import time
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from sudo_x.models import CloudDisclosure
@@ -127,57 +127,79 @@ class MockPlanner:
 
 
 class NebiusPlanner:
-    """Offline synthetic transport for the Nebius/NVIDIA provider boundary."""
+    """Bounded real planner; model output remains validated data without tools."""
 
-    def __init__(self, config: ProviderConfig):
+    def __init__(self, config: ProviderConfig, client_factory=None):
         if config.kind != "nebius" or not config.model or not config.base_url:
             raise ValueError("NebiusPlanner requires complete Nebius configuration.")
         self.config = config
         self.budget = Budget(config.timeout_seconds, config.max_tokens)
+        self.client_factory = client_factory or httpx.Client
 
     def plan(self, prompt: str) -> ProviderPlan:
         if not prompt.strip():
             raise ValueError("A planner prompt cannot be blank.")
-        started = time.monotonic()
-        if time.monotonic() - started > self.budget.timeout_seconds:
-            return self._blocked("Synthetic provider budget expired before planning.")
-
-        # This is deliberately local and deterministic. It proves the typed boundary
-        # without creating an outbound request or granting tool authority.
-        envelope = PlanEnvelope(
-            capability_id="request",
-            action="propose",
-            arguments={"prompt_length": len(prompt), "max_tokens": self.budget.max_tokens},
-            rationale="Synthetic Nebius/NVIDIA probe returned a typed non-executable proposal.",
-        )
+        payload = {
+            "model": self.config.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        'You are a planning component, not an executor. Return only compact JSON '
+                        'matching this exact shape: {"version":"1","capability_id":"system",'
+                        '"action":"propose","arguments":{},"rationale":"..."}. The version '
+                        'must be the string "1", not the number 1. Never include command, argv, '
+                        'shell, exec, script, target, url, or tool calls. Do not include private '
+                        "reasoning."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "max_completion_tokens": self.budget.max_tokens,
+            "temperature": 0,
+            "stream": False,
+            "n": 1,
+            "store": False,
+        }
+        try:
+            with self.client_factory(
+                timeout=self.budget.timeout_seconds, follow_redirects=False, trust_env=False
+            ) as client:
+                response = client.post(
+                    f"{self.config.base_url.rstrip('/')}/chat/completions",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {os.environ['NEBIUS_API_KEY']}"},
+                )
+            if response.status_code != 200:
+                raise ValueError("Nebius rejected the planner preview.")
+            if len(response.content) > 32768:
+                raise ValueError("Nebius planner response exceeded the allowed size.")
+            body = response.json()
+            if body.get("model") != self.config.model:
+                raise ValueError("Nebius returned an unexpected planner model.")
+            choices = body["choices"]
+            if len(choices) != 1 or choices[0]["finish_reason"] != "stop":
+                raise ValueError("Nebius did not return one complete planner response.")
+            message = choices[0]["message"]
+            if message.get("tool_calls") or message.get("function_call"):
+                raise ValueError("Tool calls are not accepted by the planner preview.")
+            envelope = PlanEnvelope.model_validate_json(message["content"])
+        except (httpx.HTTPError, TimeoutError, ValueError, KeyError, IndexError, TypeError) as exc:
+            raise ValueError("Nebius planner preview failed validation or timed out.") from exc
         return ProviderPlan(
-            provider="nebius",
-            model=self.config.model,
-            action="answer",
+            provider="nebius", model=self.config.model, action="answer",
             message=(
-                "Synthetic Nebius/NVIDIA transport completed locally. No external request was "
-                "made and no tool, file, network, or machine action is available."
+                "Nebius returned a validated non-executable plan. No tool, file, network, "
+                "or machine action was performed."
             ),
             envelope=envelope,
             cloud_disclosure=CloudDisclosure(
-                provider="Nebius synthetic transport",
+                provider="Nebius Token Factory",
                 model=self.config.model,
                 base_url=self.config.base_url,
-                data_handling="Synthetic local probe only; prompt was not sent to a cloud service.",
-            ),
-        )
-
-    def _blocked(self, message: str) -> ProviderPlan:
-        return ProviderPlan(
-            provider="nebius", model=self.config.model, action="blocked", message=message,
-            envelope=PlanEnvelope(
-                capability_id="request", action="blocked", rationale="Provider budget was exceeded."
-            ),
-            cloud_disclosure=CloudDisclosure(
-                provider="Nebius synthetic transport", model=self.config.model,
-                base_url=self.config.base_url,
                 data_handling=(
-                    "No prompt data was sent because the local budget gate blocked the probe."
+                    "This planner prompt was sent to Nebius. No machine snapshot, files, task "
+                    "history, screen data, or API key was included."
                 ),
             ),
         )

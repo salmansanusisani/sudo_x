@@ -328,9 +328,16 @@ def test_system_snapshot_and_persistence(storage):
         assert {event["phase"] for event in task["events"]} >= {"act", "verify", "complete"}
         listing = client.get("/api/tasks", headers=AUTH).json()["tasks"]
         assert listing == [task]
-        assert stat.S_IMODE(storage.stat().st_mode) == 0o700
-        for path in storage.iterdir():
-            assert stat.S_IMODE(path.stat().st_mode) & 0o077 == 0
+        if os.name == "nt":
+            from sudo_x.windows_storage import assert_private
+
+            assert_private(storage)
+            for path in storage.glob('tasks.sqlite3*'):
+                assert_private(path)
+        else:
+            assert stat.S_IMODE(storage.stat().st_mode) == 0o700
+            for path in storage.iterdir():
+                assert stat.S_IMODE(path.stat().st_mode) & 0o077 == 0
     with TestClient(create_app(), base_url=BASE) as client:
         assert client.get(f"/api/tasks/{task['id']}", headers=AUTH).json() == task
         assert client.post(f"/api/tasks/{task['id']}/cancel", headers=MUTATION).status_code == 409
@@ -489,7 +496,12 @@ def test_static_assets_and_traversal(storage, tmp_path):
     (assets / "main.js").write_text("// test bundle")
     outside = tmp_path / "private.txt"
     outside.write_text("must not be served")
-    (assets / "escape.txt").symlink_to(outside)
+    try:
+        (assets / "escape.txt").symlink_to(outside)
+    except OSError as exc:
+        if os.name != "nt" or exc.winerror != 1314:
+            raise
+        # Windows requires Developer Mode for unprivileged symlink creation.
     with TestClient(create_app(ui_dir=assets), base_url=BASE) as client:
         assert client.get("/").status_code == 200
         assert client.get("/main.js").text == "// test bundle"
@@ -513,6 +525,10 @@ def test_storage_permissions_and_single_process(storage, tmp_path):
             Store(storage)
     finally:
         store.close()
+    reopened = Store(storage)
+    reopened.close()
+    if os.name == "nt":
+        return  # Windows ACL and reparse-point rejection have dedicated tests.
     unsafe = tmp_path / "public-data"
     unsafe.mkdir(mode=0o755)
     unsafe.chmod(0o755)
@@ -527,6 +543,7 @@ def test_storage_permissions_and_single_process(storage, tmp_path):
 def test_xdg_and_token_configuration(monkeypatch, tmp_path):
     monkeypatch.delenv("SUDOX_DATA_DIR", raising=False)
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     assert data_directory() == tmp_path / "sudo-x"
     monkeypatch.setenv("SUDOX_DATA_DIR", "relative/path")
     with pytest.raises(ValueError, match="absolute"):
@@ -542,7 +559,7 @@ def test_cli_rejects_root_and_nonloopback(monkeypatch):
     from sudo_x.cli import main
 
     monkeypatch.setattr("sys.argv", ["sudo-x"])
-    monkeypatch.setattr(os, "getuid", lambda: 0)
+    monkeypatch.setattr("sudo_x.cli.is_privileged", lambda: True)
     with pytest.raises(SystemExit) as exc:
         main()
     assert exc.value.code == 2

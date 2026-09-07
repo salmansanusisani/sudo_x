@@ -24,10 +24,21 @@ Flagship demo: notice a new service on your lab server, investigate, prepare and
 
 ## Run The First Slice
 
-The backend environment and GUI dependencies must be installed first:
+Requires Python 3.12+ and Node.js 20.19+ (or 22.12+). The current Windows development setup uses Python 3.14 and Node.js 24. Kali/Linux remains the target for future security-tool integrations; the local dashboard now also runs natively on Windows.
+
+On Windows, from this project directory in a normal PowerShell terminal:
+
+```powershell
+.\setup.ps1
+.\launch.ps1
+```
+
+Setup creates `.venv`, installs backend/frontend dependencies, and builds the GUI. Use `.\setup.ps1 -BrowserTests` to also install Chromium and run browser tests. Use `.\launch.ps1 -NoBrowser` for just the backend. If your PowerShell policy blocks local scripts, use `powershell -ExecutionPolicy Bypass -File .\setup.ps1` (or `launch.ps1`) for that invocation.
+
+On Linux, from this project directory:
 
 ```bash
-cd "/home/salman/Documents/Python/sudo x"
+python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
 cd ui
 npm ci
@@ -40,11 +51,36 @@ The launcher binds only to `127.0.0.1`, prints a private session URL, and opens 
 
 To verify the current slice:
 
+```powershell
+.\.venv\Scripts\ruff.exe check src tests
+.\.venv\Scripts\python.exe -B -m pytest -q -p no:cacheprovider
+cd ui
+npm.cmd run test:e2e
+```
+
+Linux equivalents:
+
 ```bash
 .venv/bin/ruff check src tests
 .venv/bin/python -B -m pytest -q -p no:cacheprovider
-cd ui && npm run test:e2e
+cd ui
+npx playwright install chromium
+npm run test:e2e
 ```
+
+Browser tests use Playwright's managed Chromium by default. Set `CHROMIUM_PATH` to use an existing browser. Runtime data stays outside the repository: `%LOCALAPPDATA%\sudo-x` on Windows, or `$XDG_DATA_HOME/sudo-x` (default `~/.local/share/sudo-x`) on Linux. Windows storage enforces a private user/SYSTEM/administrators ACL and an exclusive launcher lease; Linux retains its owner/mode checks and `flock`. Windows load averages and Linux `/proc` memory counters are unavailable and honestly shown as null.
+
+## Synthetic Nebius Probe
+
+The next provider milestone has a standalone, synthetic-only transport. It does not enable the dashboard planner or execute tasks. First inspect its exact disclosure, without credentials or a network call:
+
+```powershell
+.\.venv\Scripts\python.exe -m sudo_x.probe --model nvidia/YOUR_ACCOUNT_MODEL_ID
+```
+
+Replace the placeholder with an exact NVIDIA model ID available in your Nebius account. The preview contains the fixed imaginary-service scenario, endpoint, completion cap (at most 256), one-request limit per invocation, 15-second deadline, and 32 KiB response cap. It sends no machine snapshot, files, task history, or user prompts. The transport follows the [Nebius chat completions API](https://docs.tokenfactory.nebius.com/api-reference/inference/create-chat-completion).
+
+After reviewing the disclosure, configuring `NEBIUS_API_KEY` securely in the local environment, and confirming an account-side spending limit, explicitly sending requires all three flags: `--send --approve-synthetic-cloud --confirm-account-spend-limit`. There are no retries or redirects. These confirmations are manual; the app cannot verify the account's spending or retention settings. Cost remains unknown, token/time limits are not dollar limits, and a timed-out call may still be billed. `store=false` does not establish organization-level Zero Data Retention. No live probe has been run or hackathon inference requirement demonstrated yet.
 
 ## Current Implementation
 
@@ -52,6 +88,8 @@ cd ui && npm run test:e2e
 - Offline geography globe focused on Nigeria with Abuja/Lagos reference points. It explicitly does not claim live news.
 - Real read-only local system snapshot: OS, kernel, Python, CPU count, load, and memory from bounded local observations.
 - Persistent local SQLite task/event history and restart reconciliation.
+- Native Windows setup/launcher and private storage, alongside the Linux implementation.
+- Standalone synthetic Nebius transport with disclosure preview and offline failure/boundary tests; live validation pending.
 - Optional user-selected screen preview using browser permission. Frames remain in the local view and are not sent to AI; computer control is not implemented.
 - Optional local browser speech narration if an available local voice exists. Microphone input is not accessed.
 - Honest blocked states for general requests, live news, arbitrary shell, security tools, remote machines, and model reasoning.
@@ -62,7 +100,7 @@ cd ui && npm run test:e2e
 
 This is a functioning first slice, not the finished JARVIS vision. Nmap, SSH, coding execution, live news retrieval, Nebius/NVIDIA reasoning, memory skills, and autonomous computer control remain planned integrations.
 
-The user requested planning first. Obtain explicit implementation approval before scaffolding, installing packages, starting services, or making paid API calls.
+Local implementation and dependency installation are authorized. Paid inference, live scans, remote access, and sensitive capture still need their specific scope and consent.
 
 ## Important Facts
 
@@ -70,6 +108,6 @@ The user requested planning first. Obtain explicit implementation approval befor
 - Requires a real Nebius Token Factory runtime inference call or execution on Nebius AI Cloud, and at least one NVIDIA open source model.
 - Target: at least 90% verified task success on a defined held-out benchmark. This is not an achieved result or a probability of winning.
 - Existing sibling project `../sudo/` is separate and must remain untouched. Its README describes an earlier personal assistant prototype.
-- Folder: `/home/salman/Documents/Python/sudo x/`. Always quote the path in shell commands. Planned executable name: `sudo-x`, never `sudo`.
+- Current Windows workspace: `C:\Users\Erazer\OneDrive\Documents\sudo_x`. Original Linux workspace: `/home/salman/Documents/Python/sudo x/`. Quote paths in shell commands. Executable name: `sudo-x`, never `sudo`.
 
 Research and planning date: September 7, 2026. Recheck rules and vendor documentation before implementation and submission.

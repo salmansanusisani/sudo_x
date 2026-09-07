@@ -1,10 +1,13 @@
 """Provider boundary: model access is explicit, typed, and disabled by default."""
 
 import os
+import time
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from sudo_x.models import CloudDisclosure
 
 ProviderKind = Literal["not_configured", "mock", "nebius"]
 PlanAction = Literal["blocked", "propose"]
@@ -35,6 +38,14 @@ class ProviderConfig:
     kind: ProviderKind
     model: str | None = None
     base_url: str | None = None
+    timeout_seconds: float = 5.0
+    max_tokens: int = 256
+
+
+@dataclass(frozen=True)
+class Budget:
+    timeout_seconds: float
+    max_tokens: int
 
 
 @dataclass(frozen=True)
@@ -46,6 +57,7 @@ class ProviderPlan:
     action: Literal["blocked", "answer"]
     message: str
     envelope: PlanEnvelope | None = None
+    cloud_disclosure: CloudDisclosure | None = None
 
 
 class Planner(Protocol):
@@ -72,7 +84,19 @@ def provider_config(environ: dict[str, str] | None = None) -> ProviderConfig:
         raise ValueError("NEBIUS_BASE_URL must use HTTPS.")
     if not values.get("NEBIUS_API_KEY", "").strip():
         raise ValueError("NEBIUS_API_KEY is required when SUDOX_PROVIDER=nebius.")
-    return ProviderConfig(kind="nebius", model=model, base_url=base_url)
+    try:
+        timeout_seconds = float(values.get("SUDOX_PROVIDER_TIMEOUT_SECONDS", "5"))
+        max_tokens = int(values.get("SUDOX_PROVIDER_MAX_TOKENS", "256"))
+    except ValueError as exc:
+        raise ValueError("Provider timeout and token budgets must be numeric.") from exc
+    if not 0.1 <= timeout_seconds <= 30:
+        raise ValueError("SUDOX_PROVIDER_TIMEOUT_SECONDS must be between 0.1 and 30.")
+    if not 1 <= max_tokens <= 4096:
+        raise ValueError("SUDOX_PROVIDER_MAX_TOKENS must be between 1 and 4096.")
+    return ProviderConfig(
+        kind="nebius", model=model, base_url=base_url,
+        timeout_seconds=timeout_seconds, max_tokens=max_tokens,
+    )
 
 
 class MockPlanner:
@@ -102,8 +126,66 @@ class MockPlanner:
         )
 
 
+class NebiusPlanner:
+    """Offline synthetic transport for the Nebius/NVIDIA provider boundary."""
+
+    def __init__(self, config: ProviderConfig):
+        if config.kind != "nebius" or not config.model or not config.base_url:
+            raise ValueError("NebiusPlanner requires complete Nebius configuration.")
+        self.config = config
+        self.budget = Budget(config.timeout_seconds, config.max_tokens)
+
+    def plan(self, prompt: str) -> ProviderPlan:
+        if not prompt.strip():
+            raise ValueError("A planner prompt cannot be blank.")
+        started = time.monotonic()
+        if time.monotonic() - started > self.budget.timeout_seconds:
+            return self._blocked("Synthetic provider budget expired before planning.")
+
+        # This is deliberately local and deterministic. It proves the typed boundary
+        # without creating an outbound request or granting tool authority.
+        envelope = PlanEnvelope(
+            capability_id="request",
+            action="propose",
+            arguments={"prompt_length": len(prompt), "max_tokens": self.budget.max_tokens},
+            rationale="Synthetic Nebius/NVIDIA probe returned a typed non-executable proposal.",
+        )
+        return ProviderPlan(
+            provider="nebius",
+            model=self.config.model,
+            action="answer",
+            message=(
+                "Synthetic Nebius/NVIDIA transport completed locally. No external request was "
+                "made and no tool, file, network, or machine action is available."
+            ),
+            envelope=envelope,
+            cloud_disclosure=CloudDisclosure(
+                provider="Nebius synthetic transport",
+                model=self.config.model,
+                base_url=self.config.base_url,
+                data_handling="Synthetic local probe only; prompt was not sent to a cloud service.",
+            ),
+        )
+
+    def _blocked(self, message: str) -> ProviderPlan:
+        return ProviderPlan(
+            provider="nebius", model=self.config.model, action="blocked", message=message,
+            envelope=PlanEnvelope(
+                capability_id="request", action="blocked", rationale="Provider budget was exceeded."
+            ),
+            cloud_disclosure=CloudDisclosure(
+                provider="Nebius synthetic transport", model=self.config.model,
+                base_url=self.config.base_url,
+                data_handling=(
+                    "No prompt data was sent because the local budget gate blocked the probe."
+                ),
+            ),
+        )
+
+
 def planner_for(config: ProviderConfig) -> Planner | None:
     if config.kind == "mock":
         return MockPlanner(config)
-    # The Nebius transport is intentionally a later, separately approved milestone.
+    if config.kind == "nebius":
+        return NebiusPlanner(config)
     return None

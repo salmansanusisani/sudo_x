@@ -242,6 +242,7 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             model=plan.model,
             message=plan.message,
             envelope=plan.envelope.model_dump(mode="json"),
+            cloud_disclosure=plan.cloud_disclosure,
         )
 
     @app.get("/api/tasks", response_model=TaskList)

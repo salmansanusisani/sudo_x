@@ -90,12 +90,15 @@ No service, database outside test/runtime data, sandbox, model calls, live secur
 - Authenticated `POST /api/planner/preview` and GUI `Preview plan` are implemented. Default `not_configured` sessions return `planner_not_ready`; mock sessions render a blocked validated envelope. No preview has execution authority.
 - The richer capability-registry UI refactor was intentionally deferred because the existing one-line settings JSX is brittle; `/api/capabilities` remains the source for the next focused UI pass.
 - `ui/src/CapabilityRegistry.tsx` now renders `/api/capabilities` as a dedicated Settings panel with effect labels, descriptions, and authority/blocking reasons. The original compact backend status list remains for compatibility.
+- Synthetic Nebius/NVIDIA transport is implemented behind the provider boundary. It is deterministic and local-only: no HTTP client is invoked, no API key is retained, and general task execution remains blocked.
+- Planner previews now include a cloud-disclosure object with provider, model, base URL, and explicit data-handling language. The frontend renders this disclosure beside the non-executable plan.
+- Nebius provider budgets are bounded by `SUDOX_PROVIDER_TIMEOUT_SECONDS` (0.1-30 seconds) and `SUDOX_PROVIDER_MAX_TOKENS` (1-4096); defaults are 5 seconds and 256 tokens. These settings gate the synthetic probe and do not authorize live cloud inference.
 
 ## Exact Next Step
 
 The user has approved actual coding and the first visual slice is complete. Before live security, remote work, microphone input, screen upload, or paid inference, confirm the relevant separate permission and budget. Do not ask for API keys, passwords, or private SSH keys in chat. Do not repeat the resolved question about time constraints.
 
-Next: implement the first explicitly approved synthetic Nebius/NVIDIA transport behind the existing provider boundary, with no tool authority, cloud-disclosure preview, and a hard budget/timeout. Keep general requests blocked until structured tool calling, cloud disclosure, budgets, and deterministic policy checks exist. After that, implement Nmap fixture parsing and scope validation before any live authorized scan. Remote diagnostics precede remote mutation.
+Next: separately approve and implement a real Nebius transport only after confirming cloud consent, budget, current NVIDIA model ID, and provider data-retention terms. The current synthetic transport is not a real provider call. Keep general requests blocked until structured tool calling, cloud disclosure, budgets, and deterministic policy checks exist. After that, implement Nmap fixture parsing and scope validation before any live authorized scan. Remote diagnostics precede remote mutation.
 
 ## Resume Prompt
 

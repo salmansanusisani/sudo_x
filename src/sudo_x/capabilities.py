@@ -30,7 +30,9 @@ def registry(*, provider_kind: str = "not_configured") -> tuple[CapabilitySpec, 
     """Return capabilities for the current process; disabled means unavailable, not denied."""
     planner_description = {
         "mock": "Deterministic non-executable planning boundary; no external request is made.",
-        "nebius": "Provider is configured; transport and cloud-disclosure gates are still pending.",
+        "nebius": (
+            "Synthetic Nebius/NVIDIA transport is enabled for non-executable local probing only."
+        ),
     }.get(provider_kind, "No reasoning provider is configured.")
     return (
         CapabilitySpec(
@@ -47,7 +49,9 @@ def registry(*, provider_kind: str = "not_configured") -> tuple[CapabilitySpec, 
             id="planner", label="Structured reasoning planner", effect="plan",
             enabled=provider_kind == "mock", description=planner_description,
             reason=("Mock planner loaded." if provider_kind == "mock"
-                    else "A real provider call is not enabled in this build."),
+                    else (
+                        "Synthetic transport only; no cloud request or tool authority is enabled."
+                    )),
         ),
         CapabilitySpec(
             id="request", label="General assistant", effect="plan", enabled=False,

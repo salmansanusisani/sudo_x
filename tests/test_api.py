@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sudo_x.api import MAX_REQUEST_BYTES, create_app, session_token
 from sudo_x.engine import Engine
 from sudo_x.models import TERMINAL, TaskInput
-from sudo_x.provider import MockPlanner, PlanEnvelope, provider_config
+from sudo_x.provider import MockPlanner, NebiusPlanner, PlanEnvelope, planner_for, provider_config
 from sudo_x.store import Store, data_directory
 
 TOKEN = "test-session-token-" + "x" * 32
@@ -110,6 +110,53 @@ def test_mock_provider_is_deterministic_and_non_executable(monkeypatch):
     assert "No external request was made" in plan.message
     assert plan.envelope is not None
     assert plan.envelope.action == "blocked"
+
+
+def test_synthetic_nebius_planner_is_typed_and_non_networked():
+    config = provider_config({
+        "SUDOX_PROVIDER": "nebius",
+        "SUDOX_MODEL_PRIMARY": "nvidia/synthetic-test",
+        "NEBIUS_API_KEY": "not-used-by-synthetic-probe",
+    })
+    planner = planner_for(config)
+    assert isinstance(planner, NebiusPlanner)
+    plan = planner.plan("inspect this project")
+    assert plan.provider == "nebius"
+    assert plan.action == "answer"
+    assert plan.envelope is not None
+    assert plan.envelope.action == "propose"
+    assert plan.cloud_disclosure is not None
+    assert plan.cloud_disclosure.base_url == config.base_url
+    assert "No external request was made" in plan.message
+
+
+def test_synthetic_nebius_preview_discloses_local_probe(storage, monkeypatch):
+    monkeypatch.setenv("SUDOX_PROVIDER", "nebius")
+    monkeypatch.setenv("SUDOX_MODEL_PRIMARY", "nvidia/synthetic-test")
+    monkeypatch.setenv("NEBIUS_API_KEY", "not-used-by-synthetic-probe")
+    with TestClient(create_app(), base_url=BASE) as local_client:
+        response = local_client.post(
+            "/api/planner/preview", headers=MUTATION, json={"prompt": "inspect this project"}
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["provider"] == "nebius"
+    assert body["cloud_disclosure"]["provider"] == "Nebius synthetic transport"
+    assert body["cloud_disclosure"]["data_handling"].startswith("Synthetic local probe")
+    assert body["envelope"]["action"] == "propose"
+
+
+def test_provider_budget_configuration_is_bounded():
+    base = {
+        "SUDOX_PROVIDER": "nebius",
+        "SUDOX_MODEL_PRIMARY": "model",
+        "NEBIUS_API_KEY": "key",
+    }
+    assert provider_config({**base, "SUDOX_PROVIDER_TIMEOUT_SECONDS": "2"}).timeout_seconds == 2
+    with pytest.raises(ValueError):
+        provider_config({**base, "SUDOX_PROVIDER_TIMEOUT_SECONDS": "31"})
+    with pytest.raises(ValueError):
+        provider_config({**base, "SUDOX_PROVIDER_MAX_TOKENS": "0"})
 
 
 def test_capabilities_endpoint_explains_disabled_authority(client):

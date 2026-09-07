@@ -56,6 +56,15 @@ class CapabilityList(BaseModel):
     capabilities: list[CapabilityDescriptor]
 
 
+class CloudDisclosure(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    provider: str
+    model: str | None = None
+    base_url: str | None = None
+    data_handling: str
+
+
 class PlannerPreviewInput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -67,6 +76,7 @@ class PlannerPreview(BaseModel):
     model: str | None
     message: str
     envelope: dict[str, Any]
+    cloud_disclosure: CloudDisclosure | None = None
 
 
 class BackendStatus(BaseModel):

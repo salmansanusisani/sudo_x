@@ -14,6 +14,7 @@ export type Task = {
 export type PlannerPreview = {
   provider: 'mock' | 'nebius' | 'not_configured'; model: string | null; message: string;
   envelope: { version: string; capability_id: string; action: string; arguments: Record<string, unknown>; rationale: string };
+  cloud_disclosure: { provider: string; model: string | null; base_url: string | null; data_handling: string } | null;
 }
 export type CapabilityDescriptor = {
   id: string; label: string; enabled: boolean; description: string;

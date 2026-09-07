@@ -75,6 +75,10 @@ test('desktop view and privacy controls disclose boundaries', async ({ page }) =
   await motion.click()
   await expect(motion).toHaveAttribute('aria-checked', 'true')
   await expect(page.getByText('Reasoning provider', { exact: true })).toBeVisible()
+  const registry = page.getByRole('region', { name: 'What SUDO X can do.' })
+  await expect(registry).toBeVisible()
+  await expect(registry.getByText('Authorized network observation', { exact: true })).toBeVisible()
+  await expect(registry.getByText('Asset authorization, egress enforcement, and parser gates are not implemented.', { exact: true })).toBeVisible()
 })
 
 test('all sections fit mobile without horizontal overflow', async ({ page }) => {

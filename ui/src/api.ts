@@ -15,6 +15,11 @@ export type PlannerPreview = {
   provider: 'mock' | 'nebius' | 'not_configured'; model: string | null; message: string;
   envelope: { version: string; capability_id: string; action: string; arguments: Record<string, unknown>; rationale: string };
 }
+export type CapabilityDescriptor = {
+  id: string; label: string; enabled: boolean; description: string;
+  effect: 'read' | 'visualize' | 'plan' | 'mutate' | 'network'; reason: string;
+}
+export type CapabilityList = { version: string; capabilities: CapabilityDescriptor[] }
 export type BackendStatus = {
   mode: string;
   provider: 'not_configured' | 'mock' | 'nebius';

@@ -89,16 +89,17 @@ No service, database outside test/runtime data, sandbox, model calls, live secur
 - Capability metadata is exposed by the backend; the current GUI continues to show the simpler status view while a richer registry panel is scheduled for the next UI-focused pass.
 - Authenticated `POST /api/planner/preview` and GUI `Preview plan` are implemented. Default `not_configured` sessions return `planner_not_ready`; mock sessions render a blocked validated envelope. No preview has execution authority.
 - The richer capability-registry UI refactor was intentionally deferred because the existing one-line settings JSX is brittle; `/api/capabilities` remains the source for the next focused UI pass.
+- `ui/src/CapabilityRegistry.tsx` now renders `/api/capabilities` as a dedicated Settings panel with effect labels, descriptions, and authority/blocking reasons. The original compact backend status list remains for compatibility.
 
 ## Exact Next Step
 
 The user has approved actual coding and the first visual slice is complete. Before live security, remote work, microphone input, screen upload, or paid inference, confirm the relevant separate permission and budget. Do not ask for API keys, passwords, or private SSH keys in chat. Do not repeat the resolved question about time constraints.
 
-Next: refactor the GUI settings panel into maintainable components that consume `/api/capabilities` and show effect/reason labels. Only after the user explicitly approves a synthetic call and configures a secret locally, implement the Nebius/NVIDIA transport with cloud-disclosure and budget checks. Keep general requests blocked until structured tool calling, cloud disclosure, budgets, and deterministic policy checks exist. After that, implement Nmap fixture parsing and scope validation before any live authorized scan. Remote diagnostics precede remote mutation.
+Next: implement the first explicitly approved synthetic Nebius/NVIDIA transport behind the existing provider boundary, with no tool authority, cloud-disclosure preview, and a hard budget/timeout. Keep general requests blocked until structured tool calling, cloud disclosure, budgets, and deterministic policy checks exist. After that, implement Nmap fixture parsing and scope validation before any live authorized scan. Remote diagnostics precede remote mutation.
 
 ## Resume Prompt
 
-> Continue SUDO X in `/home/salman/Documents/Python/sudo x/`. Read README.md, PROJECT_BLUEPRINT.md, and HANDOFF.md first. The GUI/backend, provider boundary, capability registry, strict plan envelope, and planner preview are implemented and verified. Preserve unrelated work and leave sibling `sudo/` untouched. Do not enable live news, Nebius calls, microphone, Nmap, SSH, arbitrary shell, or computer control without the separate user permission and safety gate. Next refactor the settings UI into components consuming `/api/capabilities`, then consider an explicitly approved synthetic Nebius probe. Keep security authority outside the model, run the smallest tests after each change, and update this handoff with actual results before ending.
+> Continue SUDO X in `/home/salman/Documents/Python/sudo x/`. Read README.md, PROJECT_BLUEPRINT.md, and HANDOFF.md first. The GUI/backend, provider boundary, capability registry, planner preview, and dedicated CapabilityRegistry settings component are implemented and verified. Preserve unrelated work and leave sibling `sudo/` untouched. Do not enable live news, Nebius calls, microphone, Nmap, SSH, arbitrary shell, or computer control without the separate user permission and safety gate. Next consider an explicitly approved synthetic Nebius probe with no tool authority, cloud-disclosure preview, and hard budget/timeout controls. Keep security authority outside the model, run the smallest tests after each change, and update this handoff with actual results before ending.
 
 ## Session Update Template
 

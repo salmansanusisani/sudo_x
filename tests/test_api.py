@@ -13,6 +13,7 @@ from sudo_x.api import MAX_REQUEST_BYTES, create_app, session_token
 from sudo_x.engine import Engine
 from sudo_x.models import TERMINAL, TaskInput
 from sudo_x.provider import MockPlanner, NebiusPlanner, PlanEnvelope, provider_config
+from sudo_x.research import TavilyResearch
 from sudo_x.store import Store, data_directory
 
 TOKEN = "test-session-token-" + "x" * 32
@@ -26,6 +27,7 @@ def storage(tmp_path, monkeypatch):
     directory = tmp_path / "private-data"
     monkeypatch.setenv("SUDOX_DATA_DIR", str(directory))
     monkeypatch.setenv("SUDOX_SESSION_TOKEN", TOKEN)
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     return directory
 
 
@@ -81,7 +83,8 @@ def test_status_and_no_cors(client):
     assert body["version"] == "0.1.0"
     assert {cap["id"]: cap["enabled"] for cap in body["capabilities"]} == {
         "system": True, "nigeria": True, "planner": False, "request": False,
-        "security.network_scan": False, "remote.inspect": False, "code.sandbox": False,
+        "news.nigeria": False, "security.network_scan": False,
+        "remote.inspect": False, "code.sandbox": False,
     }
     assert TOKEN not in response.text
     assert response.headers["cache-control"] == "no-store"
@@ -210,6 +213,38 @@ def test_nebius_preview_discloses_cloud_boundary(storage, monkeypatch):
     assert body["cloud_disclosure"]["provider"] == "Nebius Token Factory"
     assert "sent to Nebius" in body["cloud_disclosure"]["data_handling"]
     assert body["envelope"]["action"] == "propose"
+
+
+def test_tavily_nigeria_research_validates_sources_without_local_data():
+    import httpx
+
+    def handler(request):
+        body = request.read().decode()
+        assert "hostname" not in body
+        return httpx.Response(200, json={
+            "answer": "A bounded public-source summary.",
+            "results": [{
+                "title": "Nigeria public source",
+                "url": "https://example.com/nigeria",
+                "content": "A short source excerpt.",
+                "published_date": "2026-09-08",
+            }],
+        })
+
+    research = TavilyResearch(
+        "test-tavily-key",
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handler), **kwargs
+        ),
+    )
+    result = research.search_nigeria()
+    assert str(result.sources[0].url) == "https://example.com/nigeria"
+    assert result.cloud_disclosure["provider"] == "Tavily"
+
+
+def test_tavily_research_requires_key():
+    with pytest.raises(ValueError, match="not configured"):
+        TavilyResearch("").search_nigeria()
 
 
 def test_provider_budget_configuration_is_bounded():

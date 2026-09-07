@@ -21,6 +21,11 @@ export type CapabilityDescriptor = {
   effect: 'read' | 'visualize' | 'plan' | 'mutate' | 'network'; reason: string;
 }
 export type CapabilityList = { version: string; capabilities: CapabilityDescriptor[] }
+export type ResearchResult = {
+  query: string; fetched_at: string; answer: string | null;
+  sources: { title: string; url: string; content: string; published_date: string | null }[];
+  cloud_disclosure: { provider: string; data_handling: string };
+}
 export type BackendStatus = {
   mode: string;
   provider: 'not_configured' | 'mock' | 'nebius';

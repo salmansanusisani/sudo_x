@@ -47,6 +47,14 @@ test('Nigeria focuses real geography without fabricating current news', async ({
   await page.screenshot({ path: 'test-results/nigeria-map.png', fullPage: true })
 })
 
+test('Tavily research is opt-in and shows public sources', async ({ page }) => {
+  test.skip(!process.env.SUDOX_LIVE_E2E, 'Live Tavily test spends API credit.')
+  await connect(page)
+  await page.getByRole('button', { name: 'Fetch current Nigeria sources', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Nigeria news research' })).toContainText('CURRENT PUBLIC SOURCES')
+  await expect(page.getByText('CLOUD DISCLOSURE', { exact: true })).toBeVisible()
+})
+
 test('unsupported instructions are safely rendered and blocked', async ({ page }) => {
   await connect(page)
   await page.getByLabel('Your mission').fill('<script>alert(1)</script> run nmap on the Internet')

@@ -79,6 +79,21 @@ class PlannerPreview(BaseModel):
     cloud_disclosure: CloudDisclosure | None = None
 
 
+class ResearchSource(BaseModel):
+    title: str
+    url: str
+    content: str
+    published_date: str | None = None
+
+
+class ResearchResult(BaseModel):
+    query: str
+    fetched_at: str
+    answer: str | None = None
+    sources: list[ResearchSource]
+    cloud_disclosure: dict[str, str]
+
+
 class BackendStatus(BaseModel):
     mode: Literal["local"] = "local"
     provider: Literal["not_configured", "mock", "nebius"] = "not_configured"

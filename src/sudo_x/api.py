@@ -21,11 +21,13 @@ from sudo_x.models import (
     CapabilityList,
     PlannerPreview,
     PlannerPreviewInput,
+    ResearchResult,
     Task,
     TaskInput,
     TaskList,
 )
 from sudo_x.provider import ProviderConfig, planner_for, provider_config
+from sudo_x.research import tavily_from_environment
 from sudo_x.store import Store, data_directory
 
 MAX_REQUEST_BYTES = 32768
@@ -169,6 +171,7 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
         app.state.engine = engine
         app.state.provider = configured_provider
         app.state.planner = planner_for(configured_provider)
+        app.state.research = tavily_from_environment()
         try:
             engine.start()
             yield
@@ -212,7 +215,10 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             provider=configured.kind,
             provider_model=configured.model,
             provider_ready=configured.kind in {"mock", "nebius"},
-            capabilities=[item.public() for item in registry(provider_kind=configured.kind)],
+            capabilities=[item.public() for item in registry(
+                provider_kind=configured.kind,
+                tavily_configured=app.state.research is not None,
+            )],
         )
 
     @app.get("/api/capabilities", response_model=CapabilityList)
@@ -222,7 +228,10 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             CapabilityDescriptor(
                 **item.public().model_dump(), effect=item.effect, reason=item.reason
             )
-            for item in registry(provider_kind=configured.kind)
+            for item in registry(
+                provider_kind=configured.kind,
+                tavily_configured=app.state.research is not None,
+            )
         ])
 
     @app.post("/api/planner/preview", response_model=PlannerPreview)
@@ -247,6 +256,20 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             envelope=plan.envelope.model_dump(mode="json"),
             cloud_disclosure=plan.cloud_disclosure,
         )
+
+    @app.post("/api/research/nigeria", response_model=ResearchResult)
+    async def research_nigeria(request: Request):
+        research = request.app.state.research
+        if research is None:
+            raise APIError(
+                409, "research_not_ready", "Tavily research is not configured for this session."
+            )
+        try:
+            return ResearchResult.model_validate(
+                research.search_nigeria().model_dump(mode="json")
+            )
+        except ValueError as exc:
+            raise APIError(502, "research_unavailable", str(exc)) from exc
 
     @app.get("/api/tasks", response_model=TaskList)
     async def tasks(request: Request):

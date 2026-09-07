@@ -26,7 +26,9 @@ class CapabilitySpec:
         )
 
 
-def registry(*, provider_kind: str = "not_configured") -> tuple[CapabilitySpec, ...]:
+def registry(
+    *, provider_kind: str = "not_configured", tavily_configured: bool = False
+) -> tuple[CapabilitySpec, ...]:
     """Return capabilities for the current process; disabled means unavailable, not denied."""
     planner_description = {
         "mock": "Deterministic non-executable planning boundary; no external request is made.",
@@ -45,6 +47,13 @@ def registry(*, provider_kind: str = "not_configured") -> tuple[CapabilitySpec, 
             id="nigeria", label="Nigeria offline geography", effect="visualize", enabled=True,
             description="Fixed Abuja/Lagos map demonstration only; live news is unavailable.",
             reason="Bundled geometry and fixed coordinates only.",
+        ),
+        CapabilitySpec(
+            id="news.nigeria", label="Nigeria public-source news", effect="network",
+            enabled=tavily_configured,
+            description="Bounded current-news research using a fixed public-source query.",
+            reason=("Tavily key loaded; query and sources are disclosed." if tavily_configured
+                    else "Tavily key is not configured for this session."),
         ),
         CapabilitySpec(
             id="planner", label="Structured reasoning planner", effect="plan",

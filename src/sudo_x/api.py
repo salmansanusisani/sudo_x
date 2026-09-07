@@ -1,8 +1,11 @@
+import hashlib
 import hmac
+import json
 import os
 import re
 import secrets
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -22,6 +25,8 @@ from sudo_x.models import (
     PlannerPreview,
     PlannerPreviewInput,
     ResearchResult,
+    ReviewInput,
+    ReviewReceipt,
     Task,
     TaskInput,
     TaskList,
@@ -172,6 +177,7 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
         app.state.provider = configured_provider
         app.state.planner = planner_for(configured_provider)
         app.state.research = tavily_from_environment()
+        app.state.reviews = {}
         try:
             engine.start()
             yield
@@ -270,6 +276,19 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             )
         except ValueError as exc:
             raise APIError(502, "research_unavailable", str(exc)) from exc
+
+    @app.post("/api/reviews", response_model=ReviewReceipt, status_code=201)
+    async def create_review(body: ReviewInput, request: Request):
+        canonical = json.dumps(body.content, sort_keys=True, separators=(",", ":"))
+        action_hash = hashlib.sha256(canonical.encode()).hexdigest()
+        receipt = ReviewReceipt(
+            id=secrets.token_urlsafe(12),
+            kind=body.kind,
+            action_hash=action_hash,
+            reviewed_at=datetime.now(UTC).isoformat(),
+        )
+        request.app.state.reviews[receipt.id] = receipt
+        return receipt
 
     @app.get("/api/tasks", response_model=TaskList)
     async def tasks(request: Request):

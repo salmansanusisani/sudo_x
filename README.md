@@ -92,6 +92,7 @@ After reviewing the disclosure, configuring `NEBIUS_API_KEY` securely in the loc
 - Standalone guarded Nebius transport with disclosure preview and offline failure/boundary tests; live validation verified with synthetic content.
 - Bounded live model benchmark: `nvidia/Nemotron-3_5-Lightning` is the measured default candidate; `nvidia/Nemotron-3-Ultra-550b-a55b` is retained for escalation. Benchmark evidence is recorded in `HANDOFF.md`.
 - Bounded Tavily Nigeria research action: fixed public-news query, five-source cap, source URL/date/excerpt validation, explicit cloud disclosure, and no task/tool execution.
+- Review receipts: planner/research output can be explicitly marked reviewed with a canonical SHA-256 action hash and `execution=unavailable`; review cannot trigger actions.
 - Optional user-selected screen preview using browser permission. Frames remain in the local view and are not sent to AI; computer control is not implemented.
 - Optional local browser speech narration if an available local voice exists. Microphone input is not accessed.
 - Honest blocked states for general requests, live news, arbitrary shell, security tools, remote machines, and model execution; bounded planner preview can use live Nebius inference with explicit disclosure.

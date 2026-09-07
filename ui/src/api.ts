@@ -26,6 +26,10 @@ export type ResearchResult = {
   sources: { title: string; url: string; content: string; published_date: string | null }[];
   cloud_disclosure: { provider: string; data_handling: string };
 }
+export type ReviewReceipt = {
+  id: string; kind: 'planner' | 'research'; action_hash: string;
+  status: 'reviewed'; reviewed_at: string; execution: 'unavailable';
+}
 export type BackendStatus = {
   mode: string;
   provider: 'not_configured' | 'mock' | 'nebius';

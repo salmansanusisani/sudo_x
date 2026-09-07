@@ -247,6 +247,19 @@ def test_tavily_research_requires_key():
         TavilyResearch("").search_nigeria()
 
 
+def test_review_receipt_is_hashed_and_never_executes(client):
+    response = client.post(
+        "/api/reviews", headers=MUTATION,
+        json={"kind": "planner", "content": {"action": "propose", "arguments": {}}},
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["kind"] == "planner"
+    assert len(body["action_hash"]) == 64
+    assert body["status"] == "reviewed"
+    assert body["execution"] == "unavailable"
+
+
 def test_provider_budget_configuration_is_bounded():
     base = {
         "SUDOX_PROVIDER": "nebius",

@@ -94,6 +94,22 @@ class ResearchResult(BaseModel):
     cloud_disclosure: dict[str, str]
 
 
+class ReviewInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    kind: Literal["planner", "research"]
+    content: dict[str, Any]
+
+
+class ReviewReceipt(BaseModel):
+    id: str
+    kind: Literal["planner", "research"]
+    action_hash: str
+    status: Literal["reviewed"] = "reviewed"
+    reviewed_at: str
+    execution: Literal["unavailable"] = "unavailable"
+
+
 class BackendStatus(BaseModel):
     mode: Literal["local"] = "local"
     provider: Literal["not_configured", "mock", "nebius"] = "not_configured"

@@ -12,8 +12,17 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from sudo_x.capabilities import registry
 from sudo_x.engine import Engine
-from sudo_x.models import APIError, BackendStatus, Capability, Task, TaskInput, TaskList
+from sudo_x.models import (
+    APIError,
+    BackendStatus,
+    CapabilityDescriptor,
+    CapabilityList,
+    Task,
+    TaskInput,
+    TaskList,
+)
 from sudo_x.provider import ProviderConfig, provider_config
 from sudo_x.store import Store, data_directory
 
@@ -200,23 +209,17 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             provider=configured.kind,
             provider_model=configured.model,
             provider_ready=configured.kind == "mock",
-            capabilities=[
-            Capability(
-                id="system", label="Local system snapshot", enabled=True,
-                description="Explicit read-only OS, Python, CPU, load and memory snapshot.",
-            ),
-            Capability(
-                id="nigeria", label="Nigeria offline geography", enabled=True,
-                description="Fixed Abuja/Lagos map demonstration only; live news is unavailable.",
-            ),
-            Capability(
-                id="request", label="General assistant", enabled=False,
-                description=(
-                    "Provider planning is isolated and cannot execute tools in this build."
-                    if configured.kind == "mock"
-                    else "Provider and general machine tools are not connected."
-                ),
-            ),
+            capabilities=[item.public() for item in registry(provider_kind=configured.kind)],
+        )
+
+    @app.get("/api/capabilities", response_model=CapabilityList)
+    async def capabilities():
+        configured: ProviderConfig = app.state.provider
+        return CapabilityList(capabilities=[
+            CapabilityDescriptor(
+                **item.public().model_dump(), effect=item.effect, reason=item.reason
+            )
+            for item in registry(provider_kind=configured.kind)
         ])
 
     @app.get("/api/tasks", response_model=TaskList)

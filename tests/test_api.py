@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sudo_x.api import MAX_REQUEST_BYTES, create_app, session_token
 from sudo_x.engine import Engine
 from sudo_x.models import TERMINAL, TaskInput
-from sudo_x.provider import MockPlanner, provider_config
+from sudo_x.provider import MockPlanner, PlanEnvelope, provider_config
 from sudo_x.store import Store, data_directory
 
 TOKEN = "test-session-token-" + "x" * 32
@@ -79,7 +79,8 @@ def test_status_and_no_cors(client):
     assert body["provider"] == "not_configured"
     assert body["version"] == "0.1.0"
     assert {cap["id"]: cap["enabled"] for cap in body["capabilities"]} == {
-        "system": True, "nigeria": True, "request": False,
+        "system": True, "nigeria": True, "planner": False, "request": False,
+        "security.network_scan": False, "remote.inspect": False, "code.sandbox": False,
     }
     assert TOKEN not in response.text
     assert response.headers["cache-control"] == "no-store"
@@ -107,6 +108,32 @@ def test_mock_provider_is_deterministic_and_non_executable(monkeypatch):
     assert plan.provider == "mock"
     assert plan.action == "blocked"
     assert "No external request was made" in plan.message
+    assert plan.envelope is not None
+    assert plan.envelope.action == "blocked"
+
+
+def test_capabilities_endpoint_explains_disabled_authority(client):
+    response = client.get("/api/capabilities", headers=AUTH)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["version"] == "1"
+    by_id = {item["id"]: item for item in body["capabilities"]}
+    assert by_id["security.network_scan"]["effect"] == "network"
+    assert "authorization" in by_id["security.network_scan"]["reason"]
+    assert by_id["code.sandbox"]["effect"] == "mutate"
+
+
+@pytest.mark.parametrize("payload", [
+    {
+        "capability_id": "request", "action": "propose", "rationale": "x",
+        "arguments": {"shell": "ls"},
+    },
+    {"capability_id": "request", "action": "propose", "rationale": "x", "unknown": True},
+    {"capability_id": "Request", "action": "propose", "rationale": "x"},
+])
+def test_plan_envelope_rejects_execution_or_unknown_fields(payload):
+    with pytest.raises(ValueError):
+        PlanEnvelope.model_validate(payload)
 
 
 @pytest.mark.parametrize("environ", [

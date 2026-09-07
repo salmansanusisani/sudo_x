@@ -46,6 +46,16 @@ class Capability(BaseModel):
     description: str
 
 
+class CapabilityDescriptor(Capability):
+    effect: Literal["read", "visualize", "plan", "mutate", "network"]
+    reason: str
+
+
+class CapabilityList(BaseModel):
+    version: str = "1"
+    capabilities: list[CapabilityDescriptor]
+
+
 class BackendStatus(BaseModel):
     mode: Literal["local"] = "local"
     provider: Literal["not_configured", "mock", "nebius"] = "not_configured"

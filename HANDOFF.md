@@ -20,6 +20,7 @@ Current project files:
 - `ui/`: React/Vite GUI source, offline globe, local screen preview, responsive styles, and browser tests.
 - `src/sudo_x/`: FastAPI loopback backend, SQLite task/event store, bounded local task engine, and launcher CLI.
 - `src/sudo_x/provider.py`: explicit provider configuration and deterministic non-executable mock planner boundary.
+- `src/sudo_x/capabilities.py`: versioned capability registry with effect classes and blocking reasons.
 - `launch.sh`: normal-user Chromium app-mode launcher after the GUI build.
 - `THIRD_PARTY_NOTICES.md`: geographic and interface dependency attribution.
 
@@ -84,16 +85,18 @@ No service, database outside test/runtime data, sandbox, model calls, live secur
 - Browser checks cover preview/no external requests, real system snapshot, persistence after refresh, offline Nigeria scene without fabricated news, unsupported request blocking, privacy/settings controls, mobile overflow, expired sessions, keyboard-accessible dialog, and stopping local screen capture tracks.
 - Test-only server is `tests/serve_e2e.py`; it uses a temporary data directory and fixture bearer token. Never use that token for a real session.
 - Provider boundary tests cover default `not_configured`, deterministic mock planning with no network/action execution, and rejection of incomplete/unsafe Nebius configuration.
+- Capability/plan tests cover the authenticated `/api/capabilities` contract, network/mutation effect labels, unknown-field rejection, and rejection of shell/exec/target/url fields in planner envelopes.
+- Capability metadata is exposed by the backend; the current GUI continues to show the simpler status view while a richer registry panel is scheduled for the next UI-focused pass.
 
 ## Exact Next Step
 
 The user has approved actual coding and the first visual slice is complete. Before live security, remote work, microphone input, screen upload, or paid inference, confirm the relevant separate permission and budget. Do not ask for API keys, passwords, or private SSH keys in chat. Do not repeat the resolved question about time constraints.
 
-Next: add a capability registry and structured plan envelope on top of the provider boundary. Then, only after the user explicitly approves a synthetic call and configures a secret locally, implement the Nebius/NVIDIA transport with cloud-disclosure and budget checks. Keep general requests blocked until structured tool calling, cloud disclosure, budgets, and deterministic policy checks exist. After that, implement Nmap fixture parsing and scope validation before any live authorized scan. Remote diagnostics precede remote mutation.
+Next: refactor the GUI settings panel to consume `/api/capabilities` and show effect/reason labels, then add a structured planner preview that can display a validated non-executable envelope. Only after the user explicitly approves a synthetic call and configures a secret locally, implement the Nebius/NVIDIA transport with cloud-disclosure and budget checks. Keep general requests blocked until structured tool calling, cloud disclosure, budgets, and deterministic policy checks exist. After that, implement Nmap fixture parsing and scope validation before any live authorized scan. Remote diagnostics precede remote mutation.
 
 ## Resume Prompt
 
-> Continue SUDO X in `/home/salman/Documents/Python/sudo x/`. Read README.md, PROJECT_BLUEPRINT.md, and HANDOFF.md first. The GUI/backend and provider boundary are implemented and verified. Preserve unrelated work and leave sibling `sudo/` untouched. Do not enable live news, Nebius calls, microphone, Nmap, SSH, arbitrary shell, or computer control without the separate user permission and safety gate. Next implement the capability registry and structured non-executable plan envelope; only then consider an explicitly approved synthetic Nebius probe. Keep security authority outside the model, run the smallest tests after each change, and update this handoff with actual results before ending.
+> Continue SUDO X in `/home/salman/Documents/Python/sudo x/`. Read README.md, PROJECT_BLUEPRINT.md, and HANDOFF.md first. The GUI/backend, provider boundary, capability registry, and strict non-executable plan envelope are implemented and verified. Preserve unrelated work and leave sibling `sudo/` untouched. Do not enable live news, Nebius calls, microphone, Nmap, SSH, arbitrary shell, or computer control without the separate user permission and safety gate. Next refactor the settings UI to consume `/api/capabilities`, then add a planner-preview UI that cannot execute. Only after that consider an explicitly approved synthetic Nebius probe. Keep security authority outside the model, run the smallest tests after each change, and update this handoff with actual results before ending.
 
 ## Session Update Template
 

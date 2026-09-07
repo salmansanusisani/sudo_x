@@ -4,7 +4,30 @@ import os
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 ProviderKind = Literal["not_configured", "mock", "nebius"]
+PlanAction = Literal["blocked", "propose"]
+
+
+class PlanEnvelope(BaseModel):
+    """Validated data from a planner; it has no execution method by design."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    version: Literal["1"] = "1"
+    capability_id: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9._-]*$")
+    action: PlanAction
+    arguments: dict[str, str | int | float | bool | list[str]] = Field(default_factory=dict)
+    rationale: str = Field(min_length=1, max_length=500)
+
+    @field_validator("arguments")
+    @classmethod
+    def reject_execution_fields(cls, value):
+        forbidden = {"command", "argv", "shell", "exec", "script", "target", "url"}
+        if forbidden.intersection(value):
+            raise ValueError("Execution or destination fields are not accepted by a plan envelope.")
+        return value
 
 
 @dataclass(frozen=True)
@@ -22,6 +45,7 @@ class ProviderPlan:
     model: str | None
     action: Literal["blocked", "answer"]
     message: str
+    envelope: PlanEnvelope | None = None
 
 
 class Planner(Protocol):
@@ -69,6 +93,11 @@ class MockPlanner:
             message=(
                 "Mock provider received the request but cannot execute tools or access the "
                 "machine. No external request was made."
+            ),
+            envelope=PlanEnvelope(
+                capability_id="request",
+                action="blocked",
+                rationale="Mock provider cannot execute.",
             ),
         )
 

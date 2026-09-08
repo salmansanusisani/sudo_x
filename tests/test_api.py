@@ -260,6 +260,21 @@ def test_review_receipt_is_hashed_and_never_executes(client):
     assert body["execution"] == "unavailable"
 
 
+def test_review_receipt_persists_across_store_restart(storage):
+    first = Store(storage)
+    receipt = first.create_review("research", {"query": "fixed Nigeria query"})
+    first.close()
+    second = Store(storage)
+    row = second.connection.execute(
+        "SELECT id, kind, action_hash, reviewed_at FROM reviews WHERE id = ?", (receipt.id,)
+    ).fetchone()
+    second.close()
+    assert dict(row) == {
+        "id": receipt.id, "kind": "research", "action_hash": receipt.action_hash,
+        "reviewed_at": receipt.reviewed_at,
+    }
+
+
 def test_provider_budget_configuration_is_bounded():
     base = {
         "SUDOX_PROVIDER": "nebius",

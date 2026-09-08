@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import sqlite3
@@ -6,7 +7,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from sudo_x.models import TERMINAL, APIError, Event, Phase, Status, Task, TaskInput
+from sudo_x.models import (
+    TERMINAL,
+    APIError,
+    Event,
+    Phase,
+    ReviewReceipt,
+    Status,
+    Task,
+    TaskInput,
+)
 
 if os.name == "nt":
     from sudo_x.windows_storage import acquire_lease, assert_private, prepare_directory
@@ -99,7 +109,7 @@ class Store:
         self.connection.execute("PRAGMA foreign_keys = ON")
         self.connection.execute("PRAGMA journal_mode = WAL")
         version = self.connection.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, 1):
+        if version not in (0, 1, 2):
             raise ValueError("Unsupported SUDO X database version.")
         if version == 0:
             self.connection.executescript("""
@@ -125,9 +135,29 @@ class Store:
                         message TEXT NOT NULL,
                         PRIMARY KEY(task_id, sequence)
                     );
-                    PRAGMA user_version = 1;
+                    CREATE TABLE reviews (
+                        id TEXT PRIMARY KEY,
+                        kind TEXT NOT NULL CHECK(kind IN ('planner', 'research')),
+                        action_hash TEXT NOT NULL,
+                        reviewed_at TEXT NOT NULL
+                    );
+                    CREATE INDEX reviews_recent ON reviews(reviewed_at DESC);
+                    PRAGMA user_version = 2;
                     COMMIT;
                 """)
+        elif version == 1:
+            self.connection.executescript("""
+                BEGIN;
+                CREATE TABLE reviews (
+                    id TEXT PRIMARY KEY,
+                    kind TEXT NOT NULL CHECK(kind IN ('planner', 'research')),
+                    action_hash TEXT NOT NULL,
+                    reviewed_at TEXT NOT NULL
+                );
+                CREATE INDEX reviews_recent ON reviews(reviewed_at DESC);
+                PRAGMA user_version = 2;
+                COMMIT;
+            """)
 
     def close(self) -> None:
         if self.connection is not None:
@@ -234,3 +264,16 @@ class Store:
         ).fetchall()
         for row in rows:
             self.advance(row["id"], "blocked", message, status="blocked")
+
+    def create_review(self, kind: str, content: dict) -> ReviewReceipt:
+        canonical = json.dumps(content, sort_keys=True, separators=(",", ":"))
+        receipt = ReviewReceipt(
+            id=str(uuid4()), kind=kind, action_hash=hashlib.sha256(canonical.encode()).hexdigest(),
+            reviewed_at=now(),
+        )
+        with self.connection:
+            self.connection.execute(
+                "INSERT INTO reviews VALUES (?, ?, ?, ?)",
+                (receipt.id, receipt.kind, receipt.action_hash, receipt.reviewed_at),
+            )
+        return receipt

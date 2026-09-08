@@ -21,9 +21,10 @@ The user explicitly requested environment setup, dependency installation, and co
 - Bounded Tavily Nigeria research is now available as a separate explicit action. It sends only the fixed public-news query, caps results at five with a 10-second timeout and 64 KiB response limit, validates source URLs, and returns source dates/excerpts plus a Tavily disclosure. The live route returned five sources successfully; it does not create a task or alter the offline geography behavior.
 - Planner and research panels now support an explicit review receipt. `POST /api/reviews` hashes canonical content and records a timestamp, kind, and `execution=unavailable`; review never executes a tool, task, file, network, or machine action. The receipt is the current safe approval-shaped workflow, not permission to execute.
 - Review receipts are now persisted in the private SQLite database with schema migration from version 1 to version 2 and restart-persistence coverage. Existing task history is preserved.
+- Added `src/sudo_x/nmap_fixture.py`, an offline-only bounded Nmap XML parser. It validates IPs against explicit approved CIDRs, caps XML/host/port sizes, rejects malformed or out-of-scope fixtures, and never launches Nmap or performs network I/O.
 - Browser voice input is now an opt-in transcript helper. It requests recognition only after the user clicks the microphone control, inserts transcript text for review, never auto-submits, and shows an explicit listening/error state. Unsupported browsers remain text-only.
 
-Next: let the user test live Lightning planning, Tavily sources, and persistent review receipts through the private loopback URL. Then implement Nmap fixture parsing/scope validation as the next independent security milestone. Keep live scans, remote operations, and mutations gated on enrolled assets, exact scope, and a future execution broker.
+Next: let the user test live Lightning planning, Tavily sources, persistent review receipts, and offline Nmap fixture behavior through the private loopback URL. Then add fixture evidence rendering and explicit scope-preview UI; keep live scans, remote operations, and mutations gated on enrolled assets, exact scope, and a future execution broker.
 
 ## Actual State
 

@@ -80,7 +80,7 @@ class Sandbox:
                 "bwrap", "--die-with-parent", "--unshare-net", "--ro-bind", "/usr", "/usr",
                 "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib",
                 "--ro-bind", "/lib64", "/lib64", "--proc", "/proc", "--dev", "/dev",
-                "--tmpfs", "/tmp", "--ro-bind", str(sys.prefix), str(sys.prefix),
+                "--tmpfs", "/tmp", "--clearenv", "--ro-bind", str(sys.prefix), str(sys.prefix),
                 "--bind", str(copy), "/workspace", "--chdir", "/workspace",
                 "--setenv", "HOME", "/tmp/home", "--setenv", "PYTHONPATH", "/workspace/src",
                 sys.executable, "-B", "-m", "pytest", "-q", "-p", "no:cacheprovider",

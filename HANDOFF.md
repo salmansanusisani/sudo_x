@@ -24,8 +24,9 @@ The user explicitly requested environment setup, dependency installation, and co
 - Added `src/sudo_x/nmap_fixture.py`, an offline-only bounded Nmap XML parser. It validates IPs against explicit approved CIDRs, caps XML/host/port sizes, rejects malformed or out-of-scope fixtures, and never launches Nmap or performs network I/O.
 - Browser voice input is now an opt-in transcript helper. It requests recognition only after the user clicks the microphone control, inserts transcript text for review, never auto-submits, and shows an explicit listening/error state. Unsupported browsers remain text-only.
 - Talk mode is now separate from mission submission. `POST /api/chat` sends only the user's conversation message to Nebius, rejects tools, limits response size/tokens/time, discloses cloud handling, and returns `execution=unavailable`. `Send mission` remains the blocked/local task path for actions.
+- Security Lab now renders the offline Nmap fixture evidence through a dedicated UI panel. The panel demonstrates explicit CIDR scope, host/port evidence, and the live-scan boundary; it does not run Nmap.
 
-Next: let the user test live Lightning planning, Tavily sources, persistent review receipts, and offline Nmap fixture behavior through the private loopback URL. Then add fixture evidence rendering and explicit scope-preview UI; keep live scans, remote operations, and mutations gated on enrolled assets, exact scope, and a future execution broker.
+Next: package the safe MVP for judging: create a public demo deployment/test build, record the under-three-minute English demo video, finalize Devpost description/track/feedback fields, and document the real Nebius/NVIDIA and Tavily calls. Keep live scans, remote operations, and mutations gated on enrolled assets, exact scope, and a future execution broker.
 
 ## Actual State
 

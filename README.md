@@ -95,6 +95,7 @@ After reviewing the disclosure, configuring `NEBIUS_API_KEY` securely in the loc
 - Review receipts: planner/research output can be explicitly marked reviewed with a canonical SHA-256 action hash and `execution=unavailable`; review cannot trigger actions.
 - Review receipts persist in the private SQLite store across application restarts; they are records, not execution permissions.
 - Offline Nmap fixture parser: bounded XML, explicit CIDR scope validation, hostile/malformed input rejection, and no live scanner execution.
+- Security Lab evidence panel: loads a fixed scoped fixture through `/api/security/nmap-fixture`, renders hosts/ports, and explicitly states that live scanning is unavailable.
 - Optional browser voice input: microphone access is visibly opt-in, recognition transcripts are inserted for review only, and voice never auto-submits a mission. Browser recognition service behavior must be disclosed by the browser; SUDO X does not upload audio itself.
 - Talk mode: sends only the typed conversation message to the configured Nebius model and returns a conversational response with cloud disclosure. It has no tools, machine context, task execution, or mutation authority. `Send mission` remains the separate local task path.
 - Optional user-selected screen preview using browser permission. Frames remain in the local view and are not sent to AI; computer control is not implemented.
@@ -105,7 +106,7 @@ After reviewing the disclosure, configuring `NEBIUS_API_KEY` securely in the loc
 - Planner preview control: submits text only to the configured non-executable provider boundary and displays the validated envelope. Nebius previews disclose that the prompt leaves the machine; no tool is executed.
 - Capability registry panel in Settings: shows each registered capability's effect class, description, and blocking reason from the authenticated backend contract.
 
-This is a functioning first slice, not the finished JARVIS vision. Nmap, SSH, coding execution, live news retrieval, Nebius/NVIDIA reasoning, memory skills, and autonomous computer control remain planned integrations.
+This is a functioning safe MVP, not unrestricted JARVIS automation. Live Nmap, SSH, coding execution, privileged changes, memory skills, and autonomous computer control remain gated integrations.
 
 Local implementation and dependency installation are authorized. Paid inference, live scans, remote access, and sensitive capture still need their specific scope and consent.
 
@@ -113,6 +114,8 @@ Local implementation and dependency installation are authorized. Paid inference,
 
 - Submission deadline verified from official rules: October 30, 2026, 10:00 am Pacific Daylight Time, or 17:00 UTC.
 - Requires a real Nebius Token Factory runtime inference call or execution on Nebius AI Cloud, and at least one NVIDIA open source model.
+- This repository has verified real Nebius Token Factory inference with an NVIDIA Nemotron model; the public submission still needs a working judge-accessible demo URL, public YouTube video under three minutes, Devpost registration/submission fields, and feedback text.
+- A Tavily key can enable the separate public-source Nigeria workflow; Best Use of Tavily eligibility requires documenting the functional runtime call in the submission.
 - Target: at least 90% verified task success on a defined held-out benchmark. This is not an achieved result or a probability of winning.
 - Existing sibling project `../sudo/` is separate and must remain untouched. Its README describes an earlier personal assistant prototype.
 - Current Windows workspace: `C:\Users\Erazer\OneDrive\Documents\sudo_x`. Original Linux workspace: `/home/salman/Documents/Python/sudo x/`. Quote paths in shell commands. Executable name: `sudo-x`, never `sudo`.

@@ -94,6 +94,13 @@ class ResearchResult(BaseModel):
     cloud_disclosure: dict[str, str]
 
 
+class NmapFixtureInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    xml: str = Field(min_length=1, max_length=262144)
+    scope: list[str] = Field(min_length=1, max_length=32)
+
+
 class ReviewInput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

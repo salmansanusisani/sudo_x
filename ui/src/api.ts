@@ -35,6 +35,10 @@ export type ChatResponse = {
   cloud_disclosure: { provider: string; data_handling: string };
   execution: 'unavailable';
 }
+export type NmapFixture = {
+  hosts: { address: string; status: string; ports: { port: number; protocol: string; state: string; service: string | null }[] }[];
+  scope: string[]; source: string;
+}
 export type BackendStatus = {
   mode: string;
   provider: 'not_configured' | 'mock' | 'nebius';

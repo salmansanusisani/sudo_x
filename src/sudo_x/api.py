@@ -20,6 +20,7 @@ from sudo_x.models import (
     BackendStatus,
     CapabilityDescriptor,
     CapabilityList,
+    NmapFixtureInput,
     PlannerPreview,
     PlannerPreviewInput,
     ResearchResult,
@@ -29,6 +30,7 @@ from sudo_x.models import (
     TaskInput,
     TaskList,
 )
+from sudo_x.nmap_fixture import NmapFixture, ScopePolicy, parse_fixture
 from sudo_x.provider import ProviderConfig, planner_for, provider_config
 from sudo_x.research import tavily_from_environment
 from sudo_x.store import Store, data_directory
@@ -276,6 +278,13 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             return chat_client.respond(body.message)
         except ValueError as exc:
             raise APIError(502, "chat_unavailable", str(exc)) from exc
+
+    @app.post("/api/security/nmap-fixture", response_model=NmapFixture)
+    async def nmap_fixture(body: NmapFixtureInput):
+        try:
+            return parse_fixture(body.xml, ScopePolicy(tuple(body.scope)))
+        except ValueError as exc:
+            raise APIError(422, "invalid_nmap_fixture", str(exc)) from exc
 
     @app.post("/api/research/nigeria", response_model=ResearchResult)
     async def research_nigeria(request: Request):

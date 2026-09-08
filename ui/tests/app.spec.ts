@@ -55,6 +55,26 @@ test('Tavily research is opt-in and shows public sources', async ({ page }) => {
   await expect(page.getByText('CLOUD DISCLOSURE', { exact: true })).toBeVisible()
 })
 
+test('security lab parses offline scoped fixture evidence', async ({ page }) => {
+  await connect(page)
+  await page.route('**/api/security/nmap-fixture', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      hosts: [{ address: '192.0.2.10', status: 'up', ports: [{ port: 8080, protocol: 'tcp', state: 'open', service: 'http' }] }],
+      scope: ['192.0.2.0/24'], source: 'offline_fixture',
+    }),
+  }))
+  await page.getByRole('button', { name: 'Security lab', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Security lab evidence' })).toContainText('Scope before scanning.')
+  const load = page.getByRole('button', { name: 'Load demo fixture', exact: true })
+  await expect(load).toBeEnabled()
+  await load.click()
+  await expect(page.getByRole('region', { name: 'Security lab evidence' })).toContainText('192.0.2.10')
+  await expect(page.getByRole('region', { name: 'Security lab evidence' })).toContainText('tcp/8080')
+  await expect(page.getByRole('region', { name: 'Security lab evidence' })).toContainText('Live scanning is unavailable')
+})
+
 test('unsupported instructions are safely rendered and blocked', async ({ page }) => {
   await connect(page)
   await page.getByLabel('Your mission').fill('<script>alert(1)</script> run nmap on the Internet')

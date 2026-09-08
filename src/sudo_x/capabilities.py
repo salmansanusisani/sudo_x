@@ -89,8 +89,11 @@ def registry(
         ),
         CapabilitySpec(
             id="code.sandbox", label="Isolated coding workspace", effect="mutate", enabled=False,
-            description="Create and test code in an isolated copy.",
-            reason="Sandbox executor and independent verifier gates are not implemented.",
+            description="Create and test code in an isolated copy without changing originals.",
+            reason=(
+                "Sandbox requires Linux bubblewrap; original-file application and host mutation "
+                "are unavailable."
+            ),
         ),
     )
 

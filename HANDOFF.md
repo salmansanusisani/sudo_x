@@ -25,8 +25,10 @@ The user explicitly requested environment setup, dependency installation, and co
 - Browser voice input is now an opt-in transcript helper. It requests recognition only after the user clicks the microphone control, inserts transcript text for review, never auto-submits, and shows an explicit listening/error state. Unsupported browsers remain text-only.
 - Talk mode is now separate from mission submission. `POST /api/chat` sends only the user's conversation message to Nebius, rejects tools, limits response size/tokens/time, discloses cloud handling, and returns `execution=unavailable`. `Send mission` remains the blocked/local task path for actions.
 - Security Lab now renders the offline Nmap fixture evidence through a dedicated UI panel. The panel demonstrates explicit CIDR scope, host/port evidence, and the live-scan boundary; it does not run Nmap.
+- Local coding sandbox backend is implemented with Linux `bwrap --unshare-net`. It uses a temporary project copy, excludes `.env`, `.git`, `.venv`, dependency caches, and hidden paths, runs only the bounded pytest command, returns exact diffs/test output, and never applies changes to originals. No host-execution fallback exists.
+- Code Workspace UI is now available with a proposed relative file path/content editor, isolated-test action, sandbox receipt, exact diff, and an explicit no-apply boundary. The UI does not provide an original-file mutation control.
 
-Next: package the safe MVP for judging: create a public demo deployment/test build, record the under-three-minute English demo video, finalize Devpost description/track/feedback fields, and document the real Nebius/NVIDIA and Tavily calls. Keep live scans, remote operations, and mutations gated on enrolled assets, exact scope, and a future execution broker.
+Next: package the safe MVP for judging: create a public demo deployment/test build, record the under-three-minute English demo video, finalize Devpost description/track/feedback fields, and document the real Nebius/NVIDIA and Tavily calls. Keep live scans, remote operations, and original-file mutations gated on enrolled assets, exact scope, and a future execution broker.
 
 ## Actual State
 

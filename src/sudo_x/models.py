@@ -101,6 +101,12 @@ class NmapFixtureInput(BaseModel):
     scope: list[str] = Field(min_length=1, max_length=32)
 
 
+class SandboxInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    files: dict[str, str] = Field(default_factory=dict, max_length=32)
+
+
 class ReviewInput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

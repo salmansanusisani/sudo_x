@@ -75,6 +75,15 @@ test('security lab parses offline scoped fixture evidence', async ({ page }) => 
   await expect(page.getByRole('region', { name: 'Security lab evidence' })).toContainText('Live scanning is unavailable')
 })
 
+test('code workspace exposes isolated-copy boundaries', async ({ page }) => {
+  await connect(page)
+  await page.getByRole('button', { name: 'Code workspace', exact: true }).click()
+  const workspace = page.getByRole('region', { name: 'Code workspace sandbox' })
+  await expect(workspace).toContainText('temporary bubblewrap copy')
+  await expect(workspace).toContainText('no apply button')
+  await expect(workspace.getByRole('button', { name: 'Run isolated tests' })).toBeVisible()
+})
+
 test('unsupported instructions are safely rendered and blocked', async ({ page }) => {
   await connect(page)
   await page.getByLabel('Your mission').fill('<script>alert(1)</script> run nmap on the Internet')

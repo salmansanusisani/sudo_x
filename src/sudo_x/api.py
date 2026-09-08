@@ -1,3 +1,4 @@
+import asyncio
 import hmac
 import os
 import re
@@ -26,6 +27,7 @@ from sudo_x.models import (
     ResearchResult,
     ReviewInput,
     ReviewReceipt,
+    SandboxInput,
     Task,
     TaskInput,
     TaskList,
@@ -33,6 +35,7 @@ from sudo_x.models import (
 from sudo_x.nmap_fixture import NmapFixture, ScopePolicy, parse_fixture
 from sudo_x.provider import ProviderConfig, planner_for, provider_config
 from sudo_x.research import tavily_from_environment
+from sudo_x.sandbox import Sandbox
 from sudo_x.store import Store, data_directory
 
 MAX_REQUEST_BYTES = 32768
@@ -182,6 +185,7 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             if configured_provider.kind == "nebius" and configured_provider.model
             and configured_provider.base_url else None
         )
+        app.state.sandbox = Sandbox(Path(__file__).resolve().parents[2])
         try:
             engine.start()
             yield
@@ -285,6 +289,14 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             return parse_fixture(body.xml, ScopePolicy(tuple(body.scope)))
         except ValueError as exc:
             raise APIError(422, "invalid_nmap_fixture", str(exc)) from exc
+
+    @app.post("/api/sandbox/run")
+    async def sandbox_run(body: SandboxInput, request: Request):
+        try:
+            result = await asyncio.to_thread(request.app.state.sandbox.run, body)
+            return result
+        except ValueError as exc:
+            raise APIError(422, "sandbox_unavailable", str(exc)) from exc
 
     @app.post("/api/research/nigeria", response_model=ResearchResult)
     async def research_nigeria(request: Request):

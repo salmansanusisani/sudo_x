@@ -30,6 +30,11 @@ export type ReviewReceipt = {
   id: string; kind: 'planner' | 'research'; action_hash: string;
   status: 'reviewed'; reviewed_at: string; execution: 'unavailable';
 }
+export type ChatResponse = {
+  model: string; message: string;
+  cloud_disclosure: { provider: string; data_handling: string };
+  execution: 'unavailable';
+}
 export type BackendStatus = {
   mode: string;
   provider: 'not_configured' | 'mock' | 'nebius';

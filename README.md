@@ -96,6 +96,7 @@ After reviewing the disclosure, configuring `NEBIUS_API_KEY` securely in the loc
 - Review receipts persist in the private SQLite store across application restarts; they are records, not execution permissions.
 - Offline Nmap fixture parser: bounded XML, explicit CIDR scope validation, hostile/malformed input rejection, and no live scanner execution.
 - Optional browser voice input: microphone access is visibly opt-in, recognition transcripts are inserted for review only, and voice never auto-submits a mission. Browser recognition service behavior must be disclosed by the browser; SUDO X does not upload audio itself.
+- Talk mode: sends only the typed conversation message to the configured Nebius model and returns a conversational response with cloud disclosure. It has no tools, machine context, task execution, or mutation authority. `Send mission` remains the separate local task path.
 - Optional user-selected screen preview using browser permission. Frames remain in the local view and are not sent to AI; computer control is not implemented.
 - Optional local browser speech narration if an available local voice exists. Microphone input is not accessed.
 - Honest blocked states for general requests, live news, arbitrary shell, security tools, remote machines, and model execution; bounded planner preview can use live Nebius inference with explicit disclosure.

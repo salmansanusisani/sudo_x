@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from sudo_x.capabilities import registry
+from sudo_x.chat import ChatInput, ChatResponse, chat_from_environment
 from sudo_x.engine import Engine
 from sudo_x.models import (
     APIError,
@@ -174,6 +175,11 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
         app.state.provider = configured_provider
         app.state.planner = planner_for(configured_provider)
         app.state.research = tavily_from_environment()
+        app.state.chat = (
+            chat_from_environment(configured_provider.model, configured_provider.base_url)
+            if configured_provider.kind == "nebius" and configured_provider.model
+            and configured_provider.base_url else None
+        )
         try:
             engine.start()
             yield
@@ -258,6 +264,18 @@ def create_app(*, token: str | None = None, ui_dir: Path | None = None) -> FastA
             envelope=plan.envelope.model_dump(mode="json"),
             cloud_disclosure=plan.cloud_disclosure,
         )
+
+    @app.post("/api/chat", response_model=ChatResponse)
+    async def chat(body: ChatInput, request: Request):
+        chat_client = request.app.state.chat
+        if chat_client is None:
+            raise APIError(
+                409, "chat_not_ready", "Conversation mode is not configured for this session."
+            )
+        try:
+            return chat_client.respond(body.message)
+        except ValueError as exc:
+            raise APIError(502, "chat_unavailable", str(exc)) from exc
 
     @app.post("/api/research/nigeria", response_model=ResearchResult)
     async def research_nigeria(request: Request):

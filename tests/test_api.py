@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from sudo_x.api import MAX_REQUEST_BYTES, create_app, session_token
+from sudo_x.chat import NebiusChat
 from sudo_x.engine import Engine
 from sudo_x.models import TERMINAL, TaskInput
 from sudo_x.provider import MockPlanner, NebiusPlanner, PlanEnvelope, provider_config
@@ -245,6 +246,31 @@ def test_tavily_nigeria_research_validates_sources_without_local_data():
 def test_tavily_research_requires_key():
     with pytest.raises(ValueError, match="not configured"):
         TavilyResearch("").search_nigeria()
+
+
+def test_nebius_chat_returns_conversation_without_execution():
+    import httpx
+
+    def handler(request):
+        body = request.read().decode()
+        assert "system_snapshot" not in body
+        return httpx.Response(200, json={
+            "model": "nvidia/test",
+            "choices": [{"finish_reason": "stop", "message": {
+                "content": "Hello. I can discuss your request, but I cannot execute actions."
+            }}],
+        })
+
+    chat = NebiusChat(
+        "nvidia/test", "https://example.test/v1", "test-key",
+        client_factory=lambda **kwargs: httpx.Client(
+            transport=httpx.MockTransport(handler), **kwargs
+        ),
+    )
+    response = chat.respond("hi")
+    assert response.message.startswith("Hello")
+    assert response.execution == "unavailable"
+    assert response.cloud_disclosure["provider"] == "Nebius Token Factory"
 
 
 def test_review_receipt_is_hashed_and_never_executes(client):

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Activity, ArrowDownLeft, ArrowUpRight, AudioLines, Check, CheckCheck, ChevronRight, CircleHelp, Code2, Compass, Cpu, Expand, Globe2, Layers3, LockKeyhole, Menu, MicOff, Monitor, Pause, Radio, Send, Settings2, ShieldCheck, Sparkles, Square, Terminal, Volume2, X } from 'lucide-react'
-import { api, bootstrapToken, isActive, type BackendStatus, type CapabilityList, type PlannerPreview, type ResearchResult, type ReviewReceipt, type Snapshot, type Task } from './api'
+import { api, bootstrapToken, isActive, type BackendStatus, type CapabilityList, type ChatResponse, type PlannerPreview, type ResearchResult, type ReviewReceipt, type Snapshot, type Task } from './api'
 import { Globe } from './Globe'
 import { CapabilityRegistry } from './CapabilityRegistry'
 import './styles.css'
@@ -25,6 +25,7 @@ function App() {
   const [planPreview, setPlanPreview] = useState<PlannerPreview | null>(null)
   const [research, setResearch] = useState<ResearchResult | null>(null)
   const [review, setReview] = useState<ReviewReceipt | null>(null)
+  const [chatResponse, setChatResponse] = useState<ChatResponse | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [menu, setMenu] = useState(false)
@@ -104,6 +105,16 @@ function App() {
       const latest = await api<Task>(`/tasks/${created.id}`, token)
       setTasks(previous => previous.map(t => t.id === latest.id ? latest : t))
     } catch (e) { setError(e instanceof Error ? e.message : 'Request failed.') }
+    finally { setBusy(false) }
+  }
+
+  async function sendChat() {
+    if (!prompt.trim() || !backend || busy) return
+    setBusy(true); setError(''); setChatResponse(null); setSection('control')
+    try {
+      setChatResponse(await api<ChatResponse>('/chat', token, { message: prompt.trim() }))
+      setPrompt('')
+    } catch (e) { setError(e instanceof Error ? e.message : 'Conversation is unavailable.') }
     finally { setBusy(false) }
   }
 
@@ -268,7 +279,8 @@ function App() {
                  {task && <div className="task-conversation" key={task.id}><div className="user-message">{task.prompt}</div><div className="message-label"><Sparkles size={12}/> SUDO X <span className={`task-state ${task.status}`}>{task.status}</span></div><p>{task.summary || 'Your request is in the local task queue.'}</p>{task.kind === 'nigeria' && <div className="source-needed"><Globe2 size={17}/><span>Map available<br/><small>{research ? 'Public sources fetched separately' : 'No current news fetched'}</small></span></div>}</div>}
               </div>
                <div className="suggestions"><span className="eyebrow">START A MISSION</span><button disabled={busy || !backend} onClick={() => submit('Show me news from Nigeria.', 'nigeria')}><Globe2 size={15}/><span>Bring Nigeria into focus</span><ArrowUpRight size={15}/></button><button disabled={busy || !backend} onClick={fetchNigeriaNews}><Radio size={15}/><span>Fetch current Nigeria sources</span><ArrowUpRight size={15}/></button><button disabled={busy || !backend} onClick={() => submit('Collect a read-only system snapshot.', 'system')}><Cpu size={15}/><span>Inspect this machine</span><ArrowUpRight size={15}/></button><button onClick={() => { setView('screen'); setSection('control') }}><Monitor size={15}/><span>Open my desktop view</span><ArrowUpRight size={15}/></button></div>
-               <form className="composer" onSubmit={e => { e.preventDefault(); void submit(prompt) }}><label className="sr-only" htmlFor="mission-prompt">Your mission</label><textarea ref={inputRef} id="mission-prompt" value={prompt} maxLength={2000} onChange={e => setPrompt(e.target.value)} placeholder="Tell SUDO X what you have in mind..." rows={2} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void submit(prompt) } }}/><div className="composer-tools"><button type="button" className={`icon-button ${listening ? 'narrating' : ''}`} aria-label={listening ? 'Stop voice input' : 'Start voice input'} onClick={toggleVoiceInput}>{listening ? <Square size={17}/> : <MicOff size={17}/>}</button><button type="button" className="plan-button" onClick={() => void previewPlan()} disabled={!prompt.trim() || busy || !backend}>Preview plan</button><span className="mono">{listening ? 'LISTENING' : 'TEXT MODE'} <kbd>CTRL K</kbd></span><button type="submit" className="send-button" aria-label="Send mission" disabled={!prompt.trim() || busy || !backend}><Send size={17}/></button></div></form>
+               <form className="composer" onSubmit={e => { e.preventDefault(); void submit(prompt) }}><label className="sr-only" htmlFor="mission-prompt">Your mission</label><textarea ref={inputRef} id="mission-prompt" value={prompt} maxLength={2000} onChange={e => setPrompt(e.target.value)} placeholder="Talk to SUDO X..." rows={2} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void submit(prompt) } }}/><div className="composer-tools"><button type="button" className={`icon-button ${listening ? 'narrating' : ''}`} aria-label={listening ? 'Stop voice input' : 'Start voice input'} onClick={toggleVoiceInput}>{listening ? <Square size={17}/> : <MicOff size={17}/>}</button><button type="button" className="plan-button" onClick={() => void previewPlan()} disabled={!prompt.trim() || busy || !backend}>Preview plan</button><button type="button" className="plan-button talk-button" onClick={() => void sendChat()} disabled={!prompt.trim() || busy || !backend}>Talk to SUDO X</button><span className="mono">{listening ? 'LISTENING' : 'TALK MODE'} <kbd>CTRL K</kbd></span><button type="submit" className="send-button" aria-label="Send mission" disabled={!prompt.trim() || busy || !backend}><Send size={17}/></button></div></form>
+                {chatResponse && <div className="chat-response" aria-label="SUDO X response"><div className="panel-label"><Sparkles size={13}/> SUDO X RESPONSE <span className="source-badge">{chatResponse.model}</span></div><p>{chatResponse.message}</p><div className="cloud-disclosure"><span className="mono">CLOUD DISCLOSURE</span><b>{chatResponse.cloud_disclosure.provider}</b><span>{chatResponse.cloud_disclosure.data_handling}</span></div><small>Conversation only. Execution is unavailable.</small></div>}
                 {planPreview && <div className="plan-preview" aria-label="Planner preview"><div className="panel-label"><Sparkles size={13}/> NON-EXECUTABLE PLAN <span className="source-badge">{planPreview.provider}</span></div><p>{planPreview.message}</p>{planPreview.cloud_disclosure && <div className="cloud-disclosure"><span className="mono">CLOUD DISCLOSURE</span><b>{planPreview.cloud_disclosure.provider} / {planPreview.cloud_disclosure.model}</b><span>{planPreview.cloud_disclosure.data_handling}</span></div>}<div className="plan-envelope"><span className="mono">CAPABILITY</span><b>{planPreview.envelope.capability_id}</b><span className="mono">ACTION</span><b>{planPreview.envelope.action}</b><span className="mono">RATIONALE</span><b>{planPreview.envelope.rationale}</b></div><small>Preview only. No tool, file, network, or machine action was performed.</small><button className="review-button" onClick={() => void reviewContent('planner', planPreview)}>{review?.kind === 'planner' ? 'REVIEW RECEIPT RECORDED' : 'Mark plan reviewed'}</button></div>}
                 {research && <div className="research-panel" aria-label="Nigeria news research"><div className="panel-label"><Globe2 size={13}/> CURRENT PUBLIC SOURCES <span className="source-badge">{research.sources.length} SOURCES</span></div><div className="cloud-disclosure"><span className="mono">CLOUD DISCLOSURE</span><b>{research.cloud_disclosure.provider}</b><span>{research.cloud_disclosure.data_handling}</span></div>{research.answer && <p className="research-answer">{research.answer}</p>}<div className="research-sources">{research.sources.map(source => <a key={source.url} href={source.url} target="_blank" rel="noreferrer"><b>{source.title}</b><span>{source.published_date || 'Publication date not provided'}</span><small>{source.content}</small></a>)}</div><button className="review-button" onClick={() => void reviewContent('research', research)}>{review?.kind === 'research' ? 'REVIEW RECEIPT RECORDED' : 'Mark research reviewed'}</button></div>}
                <div className="composer-note"><LockKeyhole size={10}/> Your commands stay on this machine.</div>

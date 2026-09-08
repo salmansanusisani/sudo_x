@@ -71,6 +71,15 @@ test('planner preview is explicit and non-executable', async ({ page }) => {
   await expect(page.getByText('NON-EXECUTABLE PLAN', { exact: true })).toHaveCount(0)
 })
 
+test('talk mode is separate from mission execution', async ({ page }) => {
+  test.skip(!process.env.SUDOX_LIVE_E2E, 'Live conversation test spends inference credit.')
+  await connect(page)
+  await page.getByLabel('Your mission').fill('Hi, who are you?')
+  await page.getByRole('button', { name: 'Talk to SUDO X', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'SUDO X response' })).toContainText('Conversation only')
+  await expect(page.getByText('CLOUD DISCLOSURE', { exact: true })).toBeVisible()
+})
+
 test('live planner preview shows cloud disclosure when enabled', async ({ page }) => {
   test.skip(!process.env.SUDOX_LIVE_E2E, 'Live provider test spends inference credit.')
   await connect(page)
